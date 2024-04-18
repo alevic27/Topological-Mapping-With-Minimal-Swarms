@@ -1,0 +1,165 @@
+<robot name="labyr6" version="1.0">
+  <joint name="roof_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 3.00000"/>
+    <parent link="floor_link"/>
+    <child link="roof_link"/>
+  </joint>
+  <joint name="wall1_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 -2.94590 1.50246"/>
+    <parent link="floor_link"/>
+    <child link="wall1_link"/>
+  </joint>
+  <joint name="wall2_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 2.95190 1.50246"/>
+    <parent link="floor_link"/>
+    <child link="wall2_link"/>
+  </joint>
+  <joint name="wall3_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 1.57080" xyz="2.95783 0.00565 1.50246"/>
+    <parent link="floor_link"/>
+    <child link="wall3_link"/>
+  </joint>
+  <joint name="wall4_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 1.57080" xyz="-2.94194 1.32131 1.50246"/>
+    <parent link="floor_link"/>
+    <child link="wall4_link"/>
+  </joint>
+  <joint name="wall5_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 1.57080" xyz="-0.03181 -1.32189 1.50246"/>
+    <parent link="floor_link"/>
+    <child link="wall5_link"/>
+  </joint>
+  <link name="floor_link">
+    <collision name="floor_collision">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <box size="6.00000 6.00000 0.10000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="3.00083" ixy="0.00000" ixz="0.00000" iyy="3.00083" iyz="0.00000" izz="6.00000"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <mass value="1.00000"/>
+    </inertial>
+    <visual name="floor">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <box size="6.00000 6.00000 0.10000"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="roof_link">
+    <collision name="roof_collision">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00473"/>
+      <geometry>
+        <box size="6.00000 6.00000 0.10000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="3.00083" ixy="0.00000" ixz="0.00000" iyy="3.00083" iyz="0.00000" izz="6.00000"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <mass value="1.00000"/>
+    </inertial>
+    <visual name="roof">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <box size="6.00000 6.00000 0.10000"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="wall1_link">
+    <collision name="wall1_collision">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <box size="6.00000 0.10000 2.88637"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.71316" ixy="0.00000" ixz="0.00000" iyy="3.00083" iyz="-0.00000" izz="3.71232"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00520 0.00000"/>
+      <mass value="1.00000"/>
+    </inertial>
+    <visual name="wall1">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00520 0.00000"/>
+      <geometry>
+        <box size="6.00000 0.10000 2.92368"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="wall2_link">
+    <collision name="wall2_collision">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <box size="6.00000 0.10000 2.90000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.71316" ixy="0.00000" ixz="0.00000" iyy="3.71232" iyz="0.00000" izz="3.00083"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <mass value="1.00000"/>
+    </inertial>
+    <visual name="wall2">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <box size="6.00000 0.10000 2.92368"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="wall3_link">
+    <collision name="wall3_collision">
+      <origin rpy="0.00000 0.00000 -0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <box size="6.00000 0.10000 2.90000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="3.71232" ixy="-0.00000" ixz="0.00000" iyy="0.71316" iyz="0.00000" izz="3.00083"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <mass value="1.00000"/>
+    </inertial>
+    <visual name="wall3">
+      <origin rpy="0.00000 0.00000 -0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <box size="6.00000 0.10000 2.92368"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="wall4_link">
+    <collision name="wall4_collision">
+      <origin rpy="0.00000 0.00000 -0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <box size="3.16000 0.10000 2.90000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="1.54466" ixy="-0.00000" ixz="0.00000" iyy="0.71316" iyz="0.00000" izz="0.83317"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <mass value="1.00000"/>
+    </inertial>
+    <visual name="wall4">
+      <origin rpy="0.00000 0.00000 -0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <box size="3.16038 0.10000 2.92368"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="wall5_link">
+    <collision name="wall5_collision">
+      <origin rpy="0.00000 0.00000 -0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <box size="3.16000 0.10000 2.90000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="1.54466" ixy="-0.00000" ixz="0.00000" iyy="0.71316" iyz="0.00000" izz="0.83317"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <mass value="1.00000"/>
+    </inertial>
+    <visual name="wall5">
+      <origin rpy="0.00000 0.00000 -0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <box size="3.16038 0.10000 2.92368"/>
+      </geometry>
+    </visual>
+  </link>
+</robot>

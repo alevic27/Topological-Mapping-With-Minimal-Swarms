@@ -13,15 +13,18 @@ p.setRealTimeSimulation(0)
 p.setTimeOut(10)
 
 # LOAD ASSETS
-p.loadURDF("plane.urdf" , [0, 0, 0] , [0 , 0 , 0 , 1]) # orientation as a quaternion you can use p.getQuaternionFromEuler
+# p.loadURDF("plane.urdf" , [0, 0, 0] , [0 , 0 , 0 , 1]) # orientation as a quaternion you can use p.getQuaternionFromEuler
 # loadURDF(...)
 #         bodyUniqueId = loadURDF(fileName, basePosition=[0.,0.,0.], baseOrientation=[0.,0.,0.,1.], useMaximalCoordinates=0, useFixedBase=0, flags=0, globalScaling=1.0, physicsClientId=0)
 #         Create a multibody by loading a URDF file.
 # planeId = p.loadURDF("plane.urdf")
-rd2d = p.loadURDF("r2d2.urdf"  , [0, 0, 1] , [0 , 0 , 0 , 1], useFixedBase = 0)
+# rd2d = p.loadURDF("r2d2.urdf"  , [0, 0, 1] , [0 , 0 , 0 , 1], useFixedBase = 0)
+   # ROBOT_1 = p.loadURDF("../assets/box.urdf",[0,0,0], p.getQuaternionFromEuler([0,0,0]), physicsClientId=PYB_CLIENT)
+
+labyr = p.loadURDF("labyr1.urdf" , [0, 0, 1] , [0 , 0 , 0 , 1], useFixedBase = 0)
 # test = p.loadURDF("C:\Users\gabri\Desktop\Topological_mapping\models\assets\hb.urdf"  , [0, 0, 1] , [0 , 0 , 0 , 1], useFixedBase = 0)
 # each URDF is a set of links and a baselink, useFixedBase glues the base to the floor.
-target_id = rd2d
+target_id = labyr
 
 print('il numero di joints è', p.getNumJoints(target_id))
 
