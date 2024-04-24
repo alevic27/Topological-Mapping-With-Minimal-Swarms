@@ -25,7 +25,7 @@ p.setTimeOut(10)
 plane = p.loadURDF("plane.urdf")
 labyr = p.loadURDF("labyr6.urdf",
                    [0, 0, 0],
-                   p.getQuaternionFromEuler([0,0,0]),
+                   p.getQuaternionFromEuler([0,0,10]),
                    useFixedBase = 1
                    )
 # test = p.loadURDF("C:\Users\gabri\Desktop\Topological_mapping\models\assets\hb.urdf"  , [0, 0, 1] , [0 , 0 , 0 , 1], useFixedBase = 0)
