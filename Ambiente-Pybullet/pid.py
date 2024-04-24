@@ -26,13 +26,18 @@ import numpy as np
 import pybullet as p
 import matplotlib.pyplot as plt
 
-
+"""
 from imports.utils.enums import DroneModel, Physics
 from imports.envs.CtrlAviary import CtrlAviary
 from imports.control.DSLPIDControl import DSLPIDControl
 from imports.utils.Logger import Logger
 from imports.utils.utils import sync, str2bool
-
+""" 
+from gym_pybullet_drones.utils.enums import DroneModel, Physics
+from gym_pybullet_drones.envs.CtrlAviary import CtrlAviary
+from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
+from gym_pybullet_drones.utils.Logger import Logger
+from gym_pybullet_drones.utils.utils import sync, str2bool
 
 """
 from utils.enums import DroneModel, Physics
