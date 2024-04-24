@@ -1,0 +1,1 @@
+# Scansione con sensori
