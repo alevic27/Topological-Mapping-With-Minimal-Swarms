@@ -21,7 +21,13 @@ p.setTimeOut(10)
 # rd2d = p.loadURDF("r2d2.urdf"  , [0, 0, 1] , [0 , 0 , 0 , 1], useFixedBase = 0)
    # ROBOT_1 = p.loadURDF("../assets/box.urdf",[0,0,0], p.getQuaternionFromEuler([0,0,0]), physicsClientId=PYB_CLIENT)
 
-labyr = p.loadURDF("labyr1.urdf" , [0, 0, 1] , [0 , 0 , 0 , 1], useFixedBase = 0)
+# labyr = p.loadURDF("labyr6.urdf" , [0, 0, 1] , [0 , 0 , 0 , 1], useFixedBase = 0)
+plane = p.loadURDF("plane.urdf")
+labyr = p.loadURDF("labyr6.urdf",
+                   [0, 0, 0],
+                   p.getQuaternionFromEuler([0,0,0]),
+                   useFixedBase = 1
+                   )
 # test = p.loadURDF("C:\Users\gabri\Desktop\Topological_mapping\models\assets\hb.urdf"  , [0, 0, 1] , [0 , 0 , 0 , 1], useFixedBase = 0)
 # each URDF is a set of links and a baselink, useFixedBase glues the base to the floor.
 target_id = labyr
