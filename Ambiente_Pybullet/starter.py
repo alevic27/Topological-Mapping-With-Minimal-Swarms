@@ -23,14 +23,48 @@ p.setTimeOut(10)
 
 # labyr = p.loadURDF("labyr6.urdf" , [0, 0, 1] , [0 , 0 , 0 , 1], useFixedBase = 0)
 plane = p.loadURDF("plane.urdf")
+'''
 labyr = p.loadURDF("labyr6.urdf",
                    [0, 0, 0],
                    p.getQuaternionFromEuler([0,0,10]),
                    useFixedBase = 1
                    )
+'''
+p.loadURDF("sphere2.urdf",
+                   [0, 2, .5],
+                   p.getQuaternionFromEuler([0,0,0]),
+                   )
 # test = p.loadURDF("C:\Users\gabri\Desktop\Topological_mapping\models\assets\hb.urdf"  , [0, 0, 1] , [0 , 0 , 0 , 1], useFixedBase = 0)
 # each URDF is a set of links and a baselink, useFixedBase glues the base to the floor.
-target_id = labyr
+# target_id = labyr
+target_id = [0, 0, 0]
+
+DRONE_CAM_VIEW = p.computeViewMatrix(cameraEyePosition=[0, 0, 5],
+                                             cameraTargetPosition=target_id,
+                                             cameraUpVector=[0, 0, 1],                                             
+                                             )
+
+DRONE_CAM_PRO =  p.computeProjectionMatrixFOV(fov=60.0,
+                                                    aspect=1.0,
+                                                    nearVal=1, #messo a mano
+                                                    farVal=1000.0
+                                                      )
+#SEG_FLAG = p.ER_SEGMENTATION_MASK_OBJECT_AND_LINKINDEX if segmentation else p.ER_NO_SEGMENTATION_MASK
+[w, h, rgb, dep, seg] = p.getCameraImage(width=1080,
+                                                 height=760,
+                                                 shadow=1,
+                                                 viewMatrix=DRONE_CAM_VIEW,
+                                                 projectionMatrix=DRONE_CAM_PRO,
+                                                 #flags=SEG_FLAG,
+                                                 #physicsClientId=self.CLIENT
+                                                 )
+rgb = np.reshape(rgb, (h, w, 4))
+dep = np.reshape(dep, (h, w))
+seg = np.reshape(seg, (h, w))
+#return rgb, dep, seg
+(Image.fromarray(img_input.astype('uint8'), 'RGBA')).save(os.path.join(path,"frame_"+str(frame_num)+".png"))
+
+
 
 print('il numero di joints è', p.getNumJoints(target_id))
 

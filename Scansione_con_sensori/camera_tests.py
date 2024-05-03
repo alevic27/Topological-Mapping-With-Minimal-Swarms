@@ -19,9 +19,9 @@ from gym_pybullet_drones.utils.utils import sync, str2bool
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType
 
 DEFAULT_GUI = True
-DEFAULT_RECORD_VIDEO = False # True per salvare foto
+DEFAULT_RECORD_VIDEO = True # True per salvare foto
 DEFAULT_OUTPUT_FOLDER = 'results'
-DEFAULT_COLAB = False
+DEFAULT_COLAB = True
 
 DEFAULT_OBS = ObservationType('rgb') # 'kin' or 'rgb'
 DEFAULT_ACT = ActionType('one_d_rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
@@ -31,9 +31,9 @@ DEFAULT_DRONES = DroneModel("cf2x")
 DEFAULT_PHYSICS = Physics("pyb")
 DEFAULT_GUI = True
 DEFAULT_PLOT = True
-DEFAULT_SIMULATION_FREQ_HZ = 500
-DEFAULT_CONTROL_FREQ_HZ = 500
-DEFAULT_DURATION_SEC = 20
+DEFAULT_SIMULATION_FREQ_HZ = 100
+DEFAULT_CONTROL_FREQ_HZ = 100
+DEFAULT_DURATION_SEC = 3
 DEFAULT_NUM_DRONES = 1
 
 def run(
@@ -75,6 +75,7 @@ def run(
     logger = Logger(logging_freq_hz=control_freq_hz,
                     num_drones=num_drones,
                     output_folder=output_folder,
+                    colab=colab
                     )
     
     #### Run the simulation ####################################
@@ -98,8 +99,27 @@ def run(
                                                                     target_rpy=INIT_RPY[j, :]
                                                                     )
         
-            
+        print('PRINTANDO obs')
+        print(obs)
+        print('PRINTANDO obs.shape')
+        print(obs.shape)
+        print('PRINTANDO obs[0]')
+        state = obs[0]
+        print(state)
         '''
+
+        #### Log the simulation ####################################
+        for j in range(num_drones):
+            logger.log(drone=j,
+                       timestamp=i/env.CTRL_FREQ,
+                       state=obs[j],
+                       # control=np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2], INIT_RPYS[j, :], np.zeros(6)])
+                       # control=np.hstack([INIT_XYZS[j, :]+TARGET_POS[wp_counters[j], :], INIT_RPYS[j, :], np.zeros(6)])
+                       )
+        
+
+      
+
         #### Printout ##############################################
         env.render()
 
@@ -110,7 +130,13 @@ def run(
     #### Close the environment #################################
     env.close()
 
+    #### Save the simulation results ###########################
+    logger.save()
+    logger.save_as_csv("camera_tests") # Optional CSV save
 
+    #### Plot the simulation results ###########################
+    if plot:
+        logger.plot()
     
 if __name__ == "__main__":
     #### Define and parse (optional) arguments for the script ##
