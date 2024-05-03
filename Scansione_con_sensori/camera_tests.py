@@ -100,22 +100,6 @@ def run(
         
             
         '''
-        print('################## STATO QUI ###################')
-        print(obs.shape)
-        print(obs[0].shape)
-        #print(obs[2].shape)
-
-         
-        #### Log the simulation ####################################
-        for j in range(num_drones):
-            logger.log(drone=j,
-                       timestamp=i/env.CTRL_FREQ,
-                       state=obs[j]
-                       )
-        
-
-      
-
         #### Printout ##############################################
         env.render()
 
@@ -126,9 +110,6 @@ def run(
     #### Close the environment #################################
     env.close()
 
-    #### Save the simulation results ###########################
-    logger.save()
-    logger.save_as_csv("camera_tests") # Optional CSV save
 
     
 if __name__ == "__main__":
