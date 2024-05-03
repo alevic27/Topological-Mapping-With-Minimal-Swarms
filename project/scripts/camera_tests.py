@@ -12,14 +12,14 @@ import csv
 # from stable_baselines3.common.evaluation import evaluate_policy
 
 from gym_pybullet_drones.utils.Logger import Logger
-from gym_pybullet_drones.envs.BaseRLAviary import BaseRLAviary
+from project.envs.TopoAviary import TopoAviary
 from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
 # from gym_pybullet_drones.envs.MultiHoverAviary import MultiHoverAviary
 from gym_pybullet_drones.utils.utils import sync, str2bool
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType
 
 DEFAULT_GUI = True
-DEFAULT_RECORD_VIDEO = True # True per salvare foto
+DEFAULT_SAVE_IMAGES = True # True per salvare foto
 DEFAULT_OUTPUT_FOLDER = 'results'
 DEFAULT_COLAB = True
 
@@ -35,11 +35,12 @@ DEFAULT_SIMULATION_FREQ_HZ = 100
 DEFAULT_CONTROL_FREQ_HZ = 100
 DEFAULT_DURATION_SEC = 3
 DEFAULT_NUM_DRONES = 1
+DEFAULT_IMG_RES = np.array([64, 48])
 
 def run(
         output_folder=DEFAULT_OUTPUT_FOLDER,
         colab=DEFAULT_COLAB, 
-        record_video=DEFAULT_RECORD_VIDEO, 
+        record_video=DEFAULT_SAVE_IMAGES, 
         local=True,
         drone=DEFAULT_DRONES,
         num_drones=DEFAULT_NUM_DRONES,
@@ -51,20 +52,20 @@ def run(
         duration_sec=DEFAULT_DURATION_SEC,
         ):
     
-    INIT_XYZ = np.array([[.3*i, .3*i, .1] for i in range(1,num_drones+1)])
+    INIT_XYZ = np.array([[-1, 0, 3] for i in range(1,num_drones+1)])
     INIT_RPY = np.array([[.0, .0, .0] for _ in range(num_drones)])
-    env = BaseRLAviary(drone_model=drone,
-                        num_drones=num_drones,
-                        initial_xyzs=INIT_XYZ,
-                        initial_rpys=INIT_RPY,
-                        physics=physics,
-                        pyb_freq=simulation_freq_hz,
-                        ctrl_freq=control_freq_hz,
-                        gui=gui,   
-                        record=DEFAULT_RECORD_VIDEO,
-                        obs=DEFAULT_OBS,
-                        act=DEFAULT_ACT                     
-                        )
+    env = TopoAviary(drone_model=drone,
+                     num_drones=num_drones,
+                     initial_xyzs=INIT_XYZ,
+                     initial_rpys=INIT_RPY,
+                     physics=physics,
+                     pyb_freq=simulation_freq_hz,
+                     ctrl_freq=control_freq_hz,
+                     gui=gui,   
+                     record=DEFAULT_SAVE_IMAGES,
+                     obs=DEFAULT_OBS,    
+                     img_res=DEFAULT_IMG_RES                
+                     )
     
     ctrl = [DSLPIDControl(drone_model=drone) for i in range(num_drones)]
 
@@ -79,7 +80,7 @@ def run(
                     )
     
     #### Run the simulation ####################################
-    action = np.zeros((num_drones,1))
+    action = np.zeros((num_drones,4))
     START = time.time()
 
     for i in range(0, int(duration_sec*env.CTRL_FREQ)):
@@ -145,7 +146,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_drones',         default=DEFAULT_NUM_DRONES,          type=int,           help='Number of drones (default: 3)', metavar='')
     parser.add_argument('--physics',            default=DEFAULT_PHYSICS,      type=Physics,       help='Physics updates (default: PYB)', metavar='', choices=Physics)
     parser.add_argument('--gui',                default=DEFAULT_GUI,       type=str2bool,      help='Whether to use PyBullet GUI (default: True)', metavar='')
-    parser.add_argument('--record_video',       default=DEFAULT_RECORD_VIDEO,      type=str2bool,      help='Whether to record a video (default: False)', metavar='')
+    parser.add_argument('--record_video',       default=DEFAULT_SAVE_IMAGES,      type=str2bool,      help='Whether to record a video (default: False)', metavar='')
     parser.add_argument('--plot',               default=DEFAULT_PLOT,       type=str2bool,      help='Whether to plot the simulation results (default: True)', metavar='')
     parser.add_argument('--simulation_freq_hz', default=DEFAULT_SIMULATION_FREQ_HZ,        type=int,           help='Simulation frequency in Hz (default: 240)', metavar='')
     parser.add_argument('--control_freq_hz',    default=DEFAULT_CONTROL_FREQ_HZ,         type=int,           help='Control frequency in Hz (default: 48)', metavar='')
