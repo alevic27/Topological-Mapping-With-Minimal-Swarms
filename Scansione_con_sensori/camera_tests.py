@@ -99,20 +99,20 @@ def run(
                                                                     )
         
             
-        #### Capture images ###############################
-        for j in range(num_drones):
-            BaseRLAviary._computeObs()
-        
+        '''
+        print('################## STATO QUI ###################')
+        print(obs.shape)
+        print(obs[0].shape)
+        #print(obs[2].shape)
+
          
         #### Log the simulation ####################################
         for j in range(num_drones):
             logger.log(drone=j,
                        timestamp=i/env.CTRL_FREQ,
-                       state=obs[j],
-                       # control=np.hstack([TARGET_POS[wp_counters[j], 0:2], INIT_XYZS[j, 2], INIT_RPYS[j, :], np.zeros(6)])
-                       # control=np.hstack([INIT_XYZS[j, :]+TARGET_POS[wp_counters[j], :], INIT_RPYS[j, :], np.zeros(6)])
+                       state=obs[j]
                        )
-        '''
+        
 
       
 
@@ -127,8 +127,8 @@ def run(
     env.close()
 
     #### Save the simulation results ###########################
-    # logger.save()
-    # logger.save_as_csv("camera_tests") # Optional CSV save
+    logger.save()
+    logger.save_as_csv("camera_tests") # Optional CSV save
 
     
 if __name__ == "__main__":
