@@ -1,5 +1,7 @@
 import os
+import sys
 import numpy as np
+import pkg_resources
 import pybullet as p
 import pybullet_data 
 import time
@@ -23,12 +25,19 @@ p.setTimeOut(10)
    # ROBOT_1 = p.loadURDF("../assets/box.urdf",[0,0,0], p.getQuaternionFromEuler([0,0,0]), physicsClientId=PYB_CLIENT)
 
 # labyr = p.loadURDF("labyr6.urdf" , [0, 0, 1] , [0 , 0 , 0 , 1], useFixedBase = 0)
-assets_path = '/Ambiente_Pybullet/assets'
-environment = 'labyr6.urdf'
 
 plane = p.loadURDF("plane.urdf")
 
-labyr = p.loadURDF("assets/labyr6.urdf", #os.path.join(assets_path, environment)
+topo_path = [string for string in sys.path if string.endswith('Topological-Mapping-With-Minimal-Swarms')]
+p.setAdditionalSearchPath(topo_path[0])
+
+assets_path = 'Ambiente_Pybullet/assets'
+environment = 'labyr6.urdf'
+
+
+
+
+labyr = p.loadURDF(os.path.join(assets_path, environment),
                    [0, 0, 0],
                    p.getQuaternionFromEuler([0,0,10]),
                    useFixedBase = 1
