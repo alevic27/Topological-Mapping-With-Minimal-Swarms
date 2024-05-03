@@ -28,16 +28,16 @@ p.setTimeOut(10)
 
 plane = p.loadURDF("plane.urdf")
 
-topo_path = [string for string in sys.path if string.endswith('Topological-Mapping-With-Minimal-Swarms')]
-p.setAdditionalSearchPath(topo_path[0])
+# topo_path = [string for string in sys.path if string.endswith('Topological-Mapping-With-Minimal-Swarms')]
+# p.setAdditionalSearchPath(topo_path[0])
 
-assets_path = 'Ambiente_Pybullet/assets'
+pkg_path = 'project'
 environment = 'labyr6.urdf'
 
 
 
 
-labyr = p.loadURDF(os.path.join(assets_path, environment),
+labyr = p.loadURDF(pkg_resources.resource_filename('project', 'assets/'+environment),
                    [0, 0, 0],
                    p.getQuaternionFromEuler([0,0,10]),
                    useFixedBase = 1
