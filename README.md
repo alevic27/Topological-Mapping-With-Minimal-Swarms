@@ -8,12 +8,14 @@
 Linux:
 ```
 $ conda activate drones
+$ conda install conda-build
 $ conda develop /path/to/Topological-Mapping-With-Minimal-Swarms 
 ```
 
 Windows:
 ```
 $ conda activate drones
+$ conda install conda-build
 $ conda develop \path\to\Topological-Mapping-With-Minimal-Swarms 
 ```
 

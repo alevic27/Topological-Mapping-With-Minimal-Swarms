@@ -1,1 +1,2 @@
-project\scripts\results
+project/scripts/results
+__pycache__/
