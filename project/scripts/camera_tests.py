@@ -33,9 +33,11 @@ DEFAULT_GUI = True
 DEFAULT_PLOT = True
 DEFAULT_SIMULATION_FREQ_HZ = 100
 DEFAULT_CONTROL_FREQ_HZ = 100
-DEFAULT_DURATION_SEC = 3
+DEFAULT_DURATION_SEC = 10
 DEFAULT_NUM_DRONES = 1
 DEFAULT_IMG_RES = np.array([64, 48])
+
+DEFAULT_LABYRINTH_ID = "2t"  # "0" per i 4 oggettini di BaseRLAviary, "lettera" della versione del labirinto 
 
 def run(
         output_folder=DEFAULT_OUTPUT_FOLDER,
@@ -50,9 +52,10 @@ def run(
         simulation_freq_hz=DEFAULT_SIMULATION_FREQ_HZ,
         control_freq_hz=DEFAULT_CONTROL_FREQ_HZ,
         duration_sec=DEFAULT_DURATION_SEC,
+        labyrinth_id=DEFAULT_LABYRINTH_ID,
         ):
     
-    INIT_XYZ = np.array([[-1, 0, 3] for i in range(1,num_drones+1)])
+    INIT_XYZ = np.array([[3, 0, 1] for i in range(1,num_drones+1)])
     INIT_RPY = np.array([[.0, .0, .0] for _ in range(num_drones)])
     env = TopoAviary(drone_model=drone,
                      num_drones=num_drones,
@@ -63,15 +66,18 @@ def run(
                      ctrl_freq=control_freq_hz,
                      gui=gui,   
                      record=DEFAULT_SAVE_IMAGES,
+                     labyrinth_id=labyrinth_id,
                      obs=DEFAULT_OBS,    
                      img_res=DEFAULT_IMG_RES                
                      )
     
+    #### Initialize the controllers ############################
     ctrl = [DSLPIDControl(drone_model=drone) for i in range(num_drones)]
 
     #### Obtain the PyBullet Client ID from the environment ####
     PYB_CLIENT = env.getPyBulletClient()
-
+    DRONE_IDS = env.getDroneIds()
+    
     #### Initialize the logger #################################
     logger = Logger(logging_freq_hz=control_freq_hz,
                     num_drones=num_drones,
@@ -92,14 +98,14 @@ def run(
         obs, reward, terminated, truncated, info = env.step(action)
 
         #### Compute control for the current way point #############
-        '''
+        
         for j in range(num_drones):
             action[j, :], _, _ = ctrl[j].computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
                                                                     state=obs[j],
                                                                     target_pos=INIT_XYZ[j, :],
                                                                     target_rpy=INIT_RPY[j, :]
                                                                     )
-        
+        '''
         print('PRINTANDO obs')
         print(obs)
         print('PRINTANDO obs.shape')
