@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pybullet as p
 from gymnasium import spaces
+import pkg_resources
 
 from gym_pybullet_drones.envs.BaseAviary import BaseAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType, ImageType
@@ -23,6 +24,7 @@ class TopoAviary(BaseAviary):
                  gui=False,
                  record=False,
                  obstacle_ids: list = [0],
+                 labyrinth_id: str = "0",
                  obs: ObservationType=ObservationType.RGB,
                  img_res: np.ndarray=np.array([64, 48]),
                  output_folder='results' 
@@ -67,6 +69,7 @@ class TopoAviary(BaseAviary):
         vision_attributes = True if obs == ObservationType.RGB else False
         self.OBS_TYPE = obs
         self.OBSTACLE_IDS = obstacle_ids
+        self.LABYRINTH_ID = labyrinth_id
         super().__init__(drone_model=drone_model,
                          num_drones=num_drones,
                          neighbourhood_radius=neighbourhood_radius,
@@ -98,28 +101,39 @@ class TopoAviary(BaseAviary):
         #TODO: define the logic through which we select the obstacles using the self.OBSTACLE_IDS variable
         # for the moment the function is the same as in BaseRLAviary.py
         if self.OBS_TYPE == ObservationType.RGB:
-            p.loadURDF("block.urdf",
-                       [1, 0, .1],
-                       p.getQuaternionFromEuler([0, 0, 0]),
-                       physicsClientId=self.CLIENT
-                       )
-            p.loadURDF("cube_small.urdf",
-                       [0, 1, .1],
-                       p.getQuaternionFromEuler([0, 0, 0]),
-                       physicsClientId=self.CLIENT
-                       )
-            p.loadURDF("duck_vhacd.urdf",
-                       [-1, 0, .1],
-                       p.getQuaternionFromEuler([0, 0, 0]),
-                       physicsClientId=self.CLIENT
-                       )
-            p.loadURDF("teddy_vhacd.urdf",
-                       [0, -1, .1],
-                       p.getQuaternionFromEuler([0, 0, 0]),
-                       physicsClientId=self.CLIENT
+            if self.LABYRINTH_ID == "0":
+                p.loadURDF("block.urdf",
+                           [1, 0, .1],
+                           p.getQuaternionFromEuler([0, 0, 0]),
+                           physicsClientId=self.CLIENT
+                           )
+                p.loadURDF("cube_small.urdf",
+                           [0, 1, .1],
+                           p.getQuaternionFromEuler([0, 0, 0]),
+                           physicsClientId=self.CLIENT
+                           )
+                p.loadURDF("duck_vhacd.urdf",
+                           [-1, 0, .1],
+                           p.getQuaternionFromEuler([0, 0, 0]),
+                           physicsClientId=self.CLIENT
+                           )
+                p.loadURDF("teddy_vhacd.urdf",
+                           [0, -1, .1],
+                           p.getQuaternionFromEuler([0, 0, 0]),
+                           physicsClientId=self.CLIENT
+                           )
+            else:
+                labyr = p.loadURDF(pkg_resources.resource_filename('project','assets/'+'labyr'+self.LABYRINTH_ID+'.urdf'),
+                       [0, 0, 0],
+                       p.getQuaternionFromEuler([0,0,0]),
+                       useFixedBase = 1
                        )
         else:
             pass
+
+    # TODO def _addDecorations(self):
+    # funzione più vasta di addObstacles che possa caricare vari dettagli che 
+    # aiutino la caratterizzazione dell'environment per il riconoscimento
 
     ################################################################################
         

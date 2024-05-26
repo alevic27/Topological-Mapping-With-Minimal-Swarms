@@ -1,5 +1,5 @@
 # Topological Mapping With Minimal Swarms
-
+TESTO
 ## Inizializzazione
 
 - Installare tutte le dependencies di gym-pybullet-drones (seguire il readme della repo)
