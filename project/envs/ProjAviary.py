@@ -28,12 +28,12 @@ class ProjAviary(CtrlAviary):
                  labyrinth_id: str = "0",
                  sensors_attributes = True,
                  max_sensors_range: float = np.inf,
-                 ref_distance : int = 0,
-                 s_WF: int = -1,
-                 c_omega : float = 0,
-                 c_vel: float = 0,
+                 #ref_distance : int = 0,
+                 #s_WF: int = -1,
+                 #c_omega : float = 0,
+                 #c_vel: float = 0,
                  output_folder='results',
-                 img_res: np.ndarray=np.array([64, 48]),
+                 img_res: np.ndarray=np.array([64, 48])
                  ):
         """Initialization of an environment with drones capable of performing topological mapping.
 
@@ -71,20 +71,10 @@ class ProjAviary(CtrlAviary):
             Whether to add rangefinders to the drone
         img_res: numpy array, optional
             Specify the resolution of the captured images
-        Gli input aggiunti sono:
-        sensors_attributes : booleano , optional
+        sensors_attributes : bool, optional
             mettere True se ci sono i RangeFinders
         max_sensors_range : float
             gittata RangeFinders (TODO CONTROLLARE SIA IN METRI)
-        ref_distance : int = 0,
-            distanza di riferimento dal muro per il WallFollowing
-        s_WF: int = -1,
-            wall following side: 1 for Right side, -1 for Left Side (TODO vedere se cambiare lato visto che le coordinate di destra sono negative)
-        c_omega : float = 0,
-            NON MI RICORDO CHE è
-        c_vel: float = 0,
-            NON MI RICORDO CHE è
-    
         """
 
         ####
@@ -115,10 +105,6 @@ class ProjAviary(CtrlAviary):
         # Aggiungo tot sensori al drone
         self.SENSOR_ATTR = sensors_attributes
         self.max_range = max_sensors_range   # max_sensors_range
-        self.distWallRef = ref_distance      # distanza di riferimento dal muro
-        self.sWF = s_WF                      # wall following side: 1 for Right side, -1 for Left Side
-        self.comega = c_omega                
-        self.cvel=c_vel
         self.NUM_SENSORS = 4
         if self.SENSOR_ATTR :
             self.sensor_position =np.zeros((4,3))
