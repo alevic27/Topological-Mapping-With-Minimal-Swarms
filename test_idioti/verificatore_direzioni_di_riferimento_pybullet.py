@@ -7,10 +7,13 @@ p.connect(p.GUI)
 
 # Aggiungere il percorso ai dati di PyBullet
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
-
+p.setGravity(0,0,-9.81)
 # Caricare un piano per riferimento
 planeId = p.loadURDF("plane.urdf")
-
+boxId = p.loadURDF("cube.urdf",
+                           [2, 0, 0.5],
+                           p.getQuaternionFromEuler([0, 0, 0]),                           
+                           )
 # settare la cam 
 camera_distance = 2
 camera_yaw = -90
@@ -39,12 +42,27 @@ axes = [
     [0, 0, axis_length]   # Asse Z
 ]
 
+# test raytest
+#from_positions = np.array([0.0, 0.0, 0.1])
+#to_positions = np.array([3.0, 0.0, 0.1])
+#result =p.rayTest(from_positions, to_positions)
+#
+
+from_positions = np.array([0.0, 0.0, 0.1])
+from_positions = np.vstack((from_positions, from_positions, from_positions))
+a = np.array([3.0, 0.0, 0.1])
+b = np.array([0.0, -3.0, 0.1])
+c = np.array([0.0, 3.0, 0.1])
+to_positions = np.vstack((a, b, c))
+result =p.rayTestBatch(from_positions, to_positions)
+print(result)
+
 # Aggiungere linee di debug per ciascun asse
 for i in range(3):
     p.addUserDebugLine(origin, axes[i], colors[i], lineWidth=3)
 
 # Eseguire la simulazione per qualche passo per vedere il risultato
-for _ in range(240):
+for _ in range(240*10):
     p.stepSimulation()
     time.sleep(1./240.)
 
