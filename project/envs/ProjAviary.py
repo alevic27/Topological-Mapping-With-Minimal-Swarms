@@ -21,7 +21,7 @@ class ProjAviary(CtrlAviary):
                  physics: Physics=Physics.PYB,
                  pyb_freq: int = 240,
                  ctrl_freq: int = 240,
-                 gui=False,
+                 gui=True,
                  vision=False,
                  save_imgs=False,
                  obstacle_ids=False,
@@ -77,7 +77,6 @@ class ProjAviary(CtrlAviary):
             gittata RangeFinders (TODO CONTROLLARE SIA IN METRI)
         """
 
-        ####
         self.VISION = vision
         self.SAVE = save_imgs
         self.OBSTACLE_IDS = obstacle_ids
@@ -98,15 +97,22 @@ class ProjAviary(CtrlAviary):
                          output_folder=output_folder
                          )
         
+        #### Create attributes for vision tasks ####################
+
+        if self.VISION:
+            self.IMG_RES = img_res
+            self.IMG_FRAME_PER_SEC = 24
+            self.IMG_CAPTURE_FREQ = int(self.PYB_FREQ/self.IMG_FRAME_PER_SEC)
+            if self.IMG_CAPTURE_FREQ%self.PYB_STEPS_PER_CTRL != 0:
+                print("[ERROR] in BaseAviary.__init__(), PyBullet and control frequencies incompatible with the desired video capture frame rate ({:f}Hz)".format(self.IMG_FRAME_PER_SEC))
+                exit()
+
         #set Starting GUI POV
         self.camera_distance = 4
         self.camera_yaw = -90 # apparentemente così ci si mette in direzione x positiva
         self.camera_pitch = -60     # (- np.pi/6)
         self.camera_target_position =   [ 0 , 0 , 0.5 ]      # TODO set at self.initial_xyzs
         p.resetDebugVisualizerCamera(self.camera_distance, self.camera_yaw, self.camera_pitch, self.camera_target_position)
-
-        #### Set the image resoution to the desired one
-        self.IMG_RES = img_res
 
         ### Create attributes for sensors ####################
         # Aggiungo tot sensori al drone
