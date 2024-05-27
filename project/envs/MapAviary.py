@@ -105,6 +105,17 @@ class MapAviary(ProjAviary):
 
     ################################################################################
 
+    def _decisionSystem(self): #Aggiungere gli input necessari
+        """Definisce la logica di scelta della direzione da prendere dopo uno stop
+        
+        """
+
+        #TODO: Definire funzione
+
+        pass
+    
+    ################################################################################
+
     def _WallFollowing(self,state):
         """Funzione per seguire in modo allineato il muro -> tira fuori la rotazione desiderata da mandare ai controlli
         la varibile state prende tre possibili valori:
