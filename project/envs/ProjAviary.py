@@ -108,11 +108,12 @@ class ProjAviary(CtrlAviary):
                 exit()
 
         #set Starting GUI POV
-        self.camera_distance = 4
-        self.camera_yaw = -90 # apparentemente così ci si mette in direzione x positiva
-        self.camera_pitch = -60     # (- np.pi/6)
-        self.camera_target_position =   [ 0 , 0 , 0.5 ]      # TODO set at self.initial_xyzs
-        p.resetDebugVisualizerCamera(self.camera_distance, self.camera_yaw, self.camera_pitch, self.camera_target_position)
+        if self.GUI:
+            self.camera_distance = 4
+            self.camera_yaw = -90 # apparentemente così ci si mette in direzione x positiva
+            self.camera_pitch = -60     # (- np.pi/6)
+            self.camera_target_position =   [ 0 , 0 , 0.5 ]      # TODO set at self.initial_xyzs
+            p.resetDebugVisualizerCamera(self.camera_distance, self.camera_yaw, self.camera_pitch, self.camera_target_position)
 
         ### Create attributes for sensors ####################
         # Aggiungo tot sensori al drone
