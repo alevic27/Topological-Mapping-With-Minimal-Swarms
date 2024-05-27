@@ -31,10 +31,6 @@ class ProjAviary(CtrlAviary):
                  ):
         """Initialization of an environment with drones capable of performing topological mapping.
 
-        Attributes `vision_attributes` is selected
-        based on the choice of `obs`; `obstacles` is set to True 
-        and overridden with landmarks for mapping applications
-
         Parameters
         ----------
         drone_model : DroneModel, optional
