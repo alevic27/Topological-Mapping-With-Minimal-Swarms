@@ -67,10 +67,6 @@ class ProjAviary(CtrlAviary):
             gittata RangeFinders (TODO CONTROLLARE SIA IN METRI)
         """
 
-        self.VISION = vision
-        self.SAVE = save_imgs
-        self.OBSTACLE_IDS = obstacle_ids
-        self.LABYRINTH_ID = labyrinth_id
         super().__init__(drone_model=drone_model,
                          num_drones=num_drones,
                          neighbourhood_radius=neighbourhood_radius,
@@ -85,7 +81,12 @@ class ProjAviary(CtrlAviary):
                          user_debug_gui=True,
                          output_folder=output_folder
                          )
-        
+
+        self.VISION = vision
+        self.SAVE = save_imgs
+        self.OBSTACLE_IDS = obstacle_ids
+        self.LABYRINTH_ID = labyrinth_id
+
         #### Create attributes for vision tasks ####################
         if self.VISION:
             self.IMG_RES = img_res
@@ -338,6 +339,17 @@ class ProjAviary(CtrlAviary):
     
     ################################################################################
 
+    def _storeHitPoints(self):
+        """Saves Cloud of points from Hit_point 
+
+        Returns
+        -------
+        QUALCOSA
+        """
+        pass
+    
+    ################################################################################
+
     def _computeReward(self):
         """Computes the current reward value(s).
 
@@ -396,11 +408,4 @@ class ProjAviary(CtrlAviary):
         """
         return {"answer": 42} #### Calculated by the Deep Thought supercomputer in 7.5M years
 
-    def _storeHitPoints(self):
-        """Saves Cloud of points from Hit_point 
-
-        Returns
-        -------
-        QUALCOSA
-        """
-        pass
+    

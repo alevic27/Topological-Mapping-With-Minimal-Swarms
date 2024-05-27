@@ -130,7 +130,7 @@ class NavAviary(CtrlAviary):
     ################################################################################
     # distanza minima dall'ostacolo 
     def _MinDistToWall(self):
-        observation, Hit_point = _sensorsObs(self)
+        observation, Hit_point = self._sensorsObs()
         distance=[]
         for i in range(self.NUM_DRONES):
             for j in range(observation[i][0 : 19]):
@@ -174,7 +174,7 @@ class NavAviary(CtrlAviary):
     ################################################################################     
     # funzione per seguire in modo allineato il muro -> tira fuori la rotazione 
     # desiderata da mandare ai controlli
-    ''' la varibile rotate prende tre possibili valori
+    ''' la varibile state prende tre possibili valori
         state = 0 ruotare per allinearsi al muro
         state = 1 ruotare e seguire il muro
         state = 2 ruotare attorno all'angolo

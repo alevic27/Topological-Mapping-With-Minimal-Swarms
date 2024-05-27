@@ -69,3 +69,145 @@ class MapAviary(ProjAviary):
             gittata RangeFinders (TODO CONTROLLARE SIA IN METRI)
         TODO: Aggiungere help delle variabili dopo max_sensors_range
         """        
+
+        super().__init__(drone_model=drone_model,
+                         num_drones=num_drones,
+                         neighbourhood_radius=neighbourhood_radius,
+                         initial_xyzs=initial_xyzs,
+                         initial_rpys=initial_rpys,
+                         physics=Physics.PYB,
+                         pyb_freq=pyb_freq,
+                         ctrl_freq=ctrl_freq,
+                         gui=gui,
+                         vision=vision,
+                         img_res=img_res,
+                         save_imgs=save_imgs,
+                         obstacle_ids=obstacle_ids,
+                         labyrinth_id=labyrinth_id,
+                         sensors_attributes=sensors_attributes,
+                         max_sensors_range=max_sensors_range,
+                         output_folder=output_folder
+                         )
+        
+    ################################################################################
+
+    def NextWP(self): #Aggiungere gli input necessari
+        """Definisce la logica di navigazione trovando il prossimo WP usando le funzioni:
+        - _WallFollowing()
+        - _WallFollowingAndAlign()
+        - _DecisionSystem
+        
+        """
+
+        #TODO: definire funzione
+
+        pass
+
+    ################################################################################
+
+    def _WallFollowing(self,state):
+        """Funzione per seguire in modo allineato il muro -> tira fuori la rotazione desiderata da mandare ai controlli
+        la varibile state prende tre possibili valori:
+        - state = 0 ruotare per allinearsi al muro
+        - state = 1 ruotare e seguire il muro
+        - state = 2 ruotare attorno all'angolo
+        
+        """
+        td = 0.02
+        hit_distance,Hit_point,self.Min_dist= self._MinDistToWall(self)
+        sWF = self.sWF
+        cw =self.comega
+        cv =self.cvel
+        self.beta = np.deg2rad(90 - self.alfa/2) #angolo tra rf e rs 
+        omega = []
+        vel = []
+        self.rf = [] 
+        self.rs = [] 
+        for j in range(self.NUM_DRONES) :
+
+            if hit_distance[j][1]!= self.max_range : 
+                self.rf.append(hit_distance[j][1]) # due range finders laterai
+                self.rs.append(hit_distance[j][21])
+            elif hit_distance[j][20]!=self.max_range :
+                self.rf.append(hit_distance [j][20])  #raggi esterni stereocamera/sensore di profondità 
+                self.rs.append(hit_distance[j][21])
+            else :
+                self.rf.append([self.max_range])
+                self.rs.append([self.max_range])
+            dR = self.Min_dist #minima distanza dal muro calcolata con RANSAC
+            if state == 0 :#ruoto per allinearmi al muro
+                omega.append([-1*sWF[j]*cw])
+                vel.append([0])
+                if np.abs(self.rs - self.rf * np.cos(self.beta)) < td :
+                    state = 1 # mi sono ruotato e ora voglio seguire il muro
+                if self.rf == self.max_range :
+                    state = 2 #mi giro ma non vedo più il muro quindi ci sta un angolo
+            elif state == 1 :#ruotare e seguire il muro
+                vel.append([cv])
+                Omega = self._WallFollowingandAllign(self)
+                omega.append(Omega)
+                if dR < self.distWallRef :
+                    state = 0 #sono vicino al muro devo girare per allinearmi
+                if self.rf == self.max_range :
+                    state = 2 #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo
+            elif state == 2 :
+                vel.append([cv])
+                omega.append([sWF[j]*cv/self.distWallRef])
+            if np.abs(self.rs - self.rf* np.cos(self.beta)) < 0.01 :
+                    state = 1 # ho agirato l'angolo e conttinuo a seguire il muro
+            if dR < self.distWallRef:
+                    state = 0 #sto girando vedo il muro ma non sono allineato, mi devo girare    
+        
+        return omega , vel , state
+    
+    ################################################################################
+
+    def _WallFollowingandAllign(self):
+        """funzione per seguire il muro -> mi da la omega mentre sto navigando vicino al muro per evitare di allontanarmi dal muro
+        
+        """
+        td = 0.02
+        omega=[]
+        for j in range(self.NUM_DRONES):
+            if np.abs(self.distWallRef-self.Min_dist[j]) > td :#sono lontano da td
+                if self.distWallRef-self.Min_dist[j] > td :
+                    omega.append([self.sWF*self.comega]) # molto lontano dal muro
+                else : 
+                    omega.append([-self.sWF*self.comega]) #troppo vicino al muro
+            elif np.abs(self.distWallRef-self.Min_dist[j]) < td :#sono vicino al td
+                if self.rs[j] > self.rf[j]*np.cos(self.beta):
+                      omega.append([self.sWF*self.comega])
+                else : 
+                     omega.append([-self.sWF*self.comega])
+            else :
+                 omega.append([0])
+        
+        return omega
+    
+    ################################################################################
+
+    def _MinDistToWall(self):
+        """Distanza minima dall'ostacolo 
+        
+        """
+        observation, Hit_point = self._sensorsObs()
+        distance=[]
+        for i in range(self.NUM_DRONES):
+            for j in range(observation[i][0 : 19]):
+                if observation[i][j] < self.max_range:
+                   hit_point = Hit_point[i][j]
+            if hit_point == []:
+                distance.append ([])
+            else : 
+                idx = np.random.choice(len(hit_point), 2, replace=False)
+                x1, y1 = hit_point[idx[0]][0:1]
+                x2, y2 = hit_point[idx[1]][0:1]
+
+                # Calcola l'equazione della retta usando i due punti
+                slope = (y2 - y1) / (x2 - x1)
+                intercept = y1 - slope * x1
+
+                # Valuta la distanza da ogni punto alla retta
+                distance.append([np.abs(slope * x1 - y1 + intercept) / np.sqrt(slope**2 + 1)])
+        
+        return observation, Hit_point , distance
