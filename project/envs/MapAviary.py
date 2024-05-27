@@ -89,6 +89,12 @@ class MapAviary(ProjAviary):
                          output_folder=output_folder
                          )
         
+        self.DIST_WALL_REF = ref_distance  # distanza di riferimento dal muro
+        self.S_WF = s_WF             # wall following side: 1 for Right side, -1 for Left Side
+        self.C_OMEGA = c_omega
+        self.C_VEL=c_vel
+        self.NUM_SENSORS = 4
+        
     ################################################################################
 
     def NextWP(self): #Aggiungere gli input necessari
@@ -126,9 +132,9 @@ class MapAviary(ProjAviary):
         """
         td = 0.02
         hit_distance,Hit_point,self.Min_dist= self._MinDistToWall(self)
-        sWF = self.sWF
-        cw =self.comega
-        cv =self.cvel
+        sWF = self.S_WF
+        cw = self.C_OMEGA
+        cv = self.C_VEL
         self.beta = np.deg2rad(90 - self.alfa/2) #angolo tra rf e rs 
         omega = []
         vel = []
@@ -157,16 +163,16 @@ class MapAviary(ProjAviary):
                 vel.append([cv])
                 Omega = self._WallFollowingandAllign(self)
                 omega.append(Omega)
-                if dR < self.distWallRef :
+                if dR < self.DIST_WALL_REF :
                     state = 0 #sono vicino al muro devo girare per allinearmi
                 if self.rf == self.max_range :
                     state = 2 #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo
             elif state == 2 :
                 vel.append([cv])
-                omega.append([sWF[j]*cv/self.distWallRef])
+                omega.append([sWF[j]*cv/self.DIST_WALL_REF])
             if np.abs(self.rs - self.rf* np.cos(self.beta)) < 0.01 :
                     state = 1 # ho agirato l'angolo e conttinuo a seguire il muro
-            if dR < self.distWallRef:
+            if dR < self.DIST_WALL_REF:
                     state = 0 #sto girando vedo il muro ma non sono allineato, mi devo girare    
         
         return omega , vel , state
@@ -180,16 +186,16 @@ class MapAviary(ProjAviary):
         td = 0.02
         omega=[]
         for j in range(self.NUM_DRONES):
-            if np.abs(self.distWallRef-self.Min_dist[j]) > td :#sono lontano da td
-                if self.distWallRef-self.Min_dist[j] > td :
-                    omega.append([self.sWF*self.comega]) # molto lontano dal muro
+            if np.abs(self.DIST_WALL_REF-self.Min_dist[j]) > td :#sono lontano da td
+                if self.DIST_WALL_REF-self.Min_dist[j] > td :
+                    omega.append([self.S_WF*self.C_OMEGA]) # molto lontano dal muro
                 else : 
-                    omega.append([-self.sWF*self.comega]) #troppo vicino al muro
-            elif np.abs(self.distWallRef-self.Min_dist[j]) < td :#sono vicino al td
+                    omega.append([-self.S_WF*self.C_OMEGA]) #troppo vicino al muro
+            elif np.abs(self.DIST_WALL_REF-self.Min_dist[j]) < td :#sono vicino al td
                 if self.rs[j] > self.rf[j]*np.cos(self.beta):
-                      omega.append([self.sWF*self.comega])
+                      omega.append([self.S_WF*self.C_OMEGA])
                 else : 
-                     omega.append([-self.sWF*self.comega])
+                     omega.append([-self.S_WF*self.C_OMEGA])
             else :
                  omega.append([0])
         

@@ -107,7 +107,7 @@ class ProjAviary(CtrlAviary):
         ### Create attributes for sensors ####################
         # Aggiungo tot sensori al drone
         self.SENSOR_ATTR = sensors_attributes
-        self.max_range = max_sensors_range   # max_sensors_range
+        self.MAX_RANGE = max_sensors_range   # max_sensors_range
         self.NUM_SENSORS = 4
         if self.SENSOR_ATTR :
             self.sensor_position =np.zeros((4,3))
