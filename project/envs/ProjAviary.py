@@ -1,14 +1,12 @@
-import os
 import numpy as np
 import pybullet as p
 from gymnasium import spaces
 import pkg_resources
-import math
 from gym_pybullet_drones.envs.CtrlAviary import CtrlAviary
-from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ImageType
+from gym_pybullet_drones.utils.enums import DroneModel, Physics, ImageType
 
 class ProjAviary(CtrlAviary):
-    """Multi-drone environment class for topological mapping"""
+    """Multi-drone environment class for simulation of Crazyflie drones inside labyrinths"""
 
     ################################################################################
 
@@ -29,10 +27,6 @@ class ProjAviary(CtrlAviary):
                  labyrinth_id: str = "0",
                  sensors_attributes = True,
                  max_sensors_range: float = np.inf,
-                 #ref_distance : int = 0,
-                 #s_WF: int = -1,
-                 #c_omega : float = 0,
-                 #c_vel: float = 0,
                  output_folder='results'
                  ):
         """Initialization of an environment with drones capable of performing topological mapping.
