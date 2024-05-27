@@ -153,7 +153,7 @@ class NavAviary(CtrlAviary):
     ################################################################################
     # funzione per seguire il muro -> mi da la omega mentre sto navigando vicino al muro 
     # per evitare di allontanarmi dal muro
-    def _WallFollowingandAllign(self):
+    def _WallFollowingAndAlign(self):
         td = 0.02
         omega=[]
         for j in range(self.NUM_DRONES):

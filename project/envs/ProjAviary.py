@@ -124,7 +124,11 @@ class ProjAviary(CtrlAviary):
     def step(self,
              action
              ):
-        """Advances the environment by one simulation step."""
+        """Advances the environment by one simulation step.
+        Output
+        ----------
+        obs_sensors : 
+            gittata RangeFinders (TODO CONTROLLARE SIA IN METRI)"""
         # Advance the simulation like in BaseAviary
         obs, reward, terminated, truncated, info = super().step(action)
 
@@ -241,13 +245,16 @@ class ProjAviary(CtrlAviary):
         Returns
         -------
         observation 
-            numpy array con le distanze dal primo ostacolo nelle 4 direzioni
+            (NUM_DRONES, NUM_SENSORS)-shaped array con le distanze dal primo ostacolo nelle 4 direzioni
+                                     se non trova niente prende valore max_range
         Hit_point 
-            numpy array bidimensionale (lista di punti rilevati dai rangefinders)
+            (NUM_DRONES , NUM_SENSORS, 3)-shaped array con lista di punti rilevati dai rangefinders
+            tiene [ 0 0 0] se non ha hittato in quello step
             TODO: sviluppare qualcosa che salva i 4 punti in Hit_point a ogni step
         '''
-        observation = np.array([[self.max_range,self.max_range,self.max_range,self.max_range] for j in range(self.NUM_DRONES)] )
+        observation = np.array([[self.max_range,self.max_range,self.max_range,self.max_range] for i in range(self.NUM_DRONES)] )
         Hit_point = []
+        Hit_point = np.array([[[np.inf , np.inf , np.inf] for j in range(self.NUM_SENSORS)]for i in range(self.NUM_DRONES)] )
         if self.SENSOR_ATTR:
             self.sensor_direction = np.array([
                                         [1.0, 0.0, 0.0],  # front
@@ -255,26 +262,26 @@ class ProjAviary(CtrlAviary):
                                         [-1.0, 0.0, 0.0],   # behind
                                         [0.0, -1.0, 0.0],  # Rx
                                         ]) 
-            for i in range(self.NUM_DRONES):
-                closest_hit = []
+            for i in range(self.NUM_DRONES):         
+                self.sensor_position = self._getDroneStateVector(i)[0:3]  # [1. 1. 1.] posizione
+                self.rot_mat = np.array(p.getMatrixFromQuaternion(self.quat[i, :])).reshape(3, 3) #TODO vedi ste cazzo di rotazioni
+                self.sensor_direction = np.dot(self.sensor_direction,self.rot_mat)
+                self.from_positions = np.tile(self.sensor_position, (4, 1))
+                self.to_positions = np.array([self.sensor_position + direction * self.max_range[0] for direction in self.sensor_direction])
+                result =p.rayTestBatch(self.from_positions, self.to_positions)
                 for j in range(self.NUM_SENSORS) :
-                    self.sensor_position = self._getDroneStateVector(i)[0:3]  # [1. 1. 1.] posizione
-                    self.rot_mat = np.array(p.getMatrixFromQuaternion(self.quat[i, :])).reshape(3, 3) #TODO vedi ste cazzo di rotazioni
-                    self.sensor_direction = np.dot(self.sensor_direction,self.rot_mat)
-                    self.from_positions = np.tile(self.sensor_position, (4, 1))
-                    self.to_positions = np.array([self.sensor_position + direction * self.max_range[0] for direction in self.sensor_direction])
-                    result =p.rayTestBatch(self.from_positions, self.to_positions)
                     ##  Hit fraction: {result[2]}")
                     ##  Hit position: {result[3]}")
-                    closest_hit.append(result[0])
+                    #closest_hit.append(result[j])            # temporarily turned off, trying new logic
                         #closest_hit[j][0] = result_list[j][0]
                     # Se c'è un punto di contatto, ottieni la distanza
-                    if closest_hit[j][0] != -1:
-                        hit_distance = closest_hit[j][2]*self.max_range[0]
-                        hit_point = closest_hit[j][3]
+                    if result[j][0] != -1:
+                        hit_distance = result[j][2]*self.max_range[0]
+                        hit_point = result[j][3]
                         # Aggiungi la distanza rilevata come osservazione
                         observation[i][j]= hit_distance
-                        Hit_point.append(hit_point)
+                        # appendi l'hitpoint alla lista Hit_point
+                        Hit_point [i][j] = hit_point
                     else:
                         # Se non ci sono oggetti rilevati, assegna una distanza massima
                         observation[i][j] =  self.max_range[0]
