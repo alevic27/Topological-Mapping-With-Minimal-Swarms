@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 from gym_pybullet_drones.utils.enums import DroneModel, Physics
 # importa una una classe che descrive il controllo del drone
-from gym_pybullet_drones.envs.CtrlAviary import CtrlAviary
+from project.envs.NavAviary import NavAviary
 # importa il file .py con la definizione di tutte le function necessarie al controllo PID 
 #(ci v messo per forza un drone CF2X o CF"P perchè presenta parametri
 #di controllo solo per questi due tipi)
@@ -38,7 +38,10 @@ DEFAULT_USER_DEBUG_GUI = False
 DEFAULT_OBSTACLES = True 
 DEFAULT_SIMULATION_FREQ_HZ = 240
 DEFAULT_CONTROL_FREQ_HZ = 48
-DEFAULT_DURATION_SEC = 20
+DEFAULT_DURATION_SEC = 50
+DEFAULT_SENSORS_ATTRIBUTES = True
+DEFAULT_SENSORS_RANGE = 4.,
+DEFAULT_REF_DISTANCE = 1.,
 DEFAULT_OUTPUT_FOLDER = 'results'
 DEFAULT_COLAB = False
 
@@ -60,6 +63,9 @@ def run(
         simulation_freq_hz=DEFAULT_SIMULATION_FREQ_HZ,
         control_freq_hz=DEFAULT_CONTROL_FREQ_HZ,
         duration_sec=DEFAULT_DURATION_SEC,
+        sensors_attributes= DEFAULT_SENSORS_ATTRIBUTES,
+        max_sensors_range = DEFAULT_SENSORS_RANGE,
+        ref_distance = DEFAULT_REF_DISTANCE,
         output_folder=DEFAULT_OUTPUT_FOLDER,
         colab=DEFAULT_COLAB,
         #obs_type=DEFAULT_OBS,
@@ -79,18 +85,19 @@ def run(
     X_target = 0
     Y_target = 2
     H_target = H_ini
-    STEP = 0.05  
+    STEP = 0.05
     NUM_WP = 1
     n_colonne = 3
-    TARGET_POS=[]
-    TARGET_POS.append([X_ini,Y_ini, H_ini])
+    TARGET_POS = INIT_XYZS
+    TARGET_RPY =  INIT_RPYS
+   
     timer = 0
     #for i in range(NUM_WP):
     #    TARGET_POS[i,:]= X_ini + i*(X_target-X_ini)/NUM_WP,Y_ini + i* (Y_target-Y_ini)/NUM_WP, H_target
     wp_counters = np.array([0 for i in range(num_drones)])  #comodo quando si fisseranno i primi nodi
     
     #### Create the environment ################################
-    env = CtrlAviary (  drone_model = drone ,
+    env = NavAviary (  drone_model = drone ,
                         neighbourhood_radius=10,
                         initial_xyzs=INIT_XYZS,
                         initial_rpys=INIT_RPYS,
@@ -101,6 +108,9 @@ def run(
                         record=record_video,
                         obstacles=obstacles,
                         user_debug_gui=user_debug_gui,
+                        sensors_attributes = sensors_attributes,
+                        max_sensors_range = max_sensors_range,
+                        ref_distance = ref_distance,
                         output_folder='results'
                         )
     #### Obtain the PyBullet Client ID from the environment ####
@@ -127,24 +137,26 @@ def run(
 
         #### Compute control for the current way point #############
         for j in range(num_drones):
-
+            
+            #### Genero la traiettoria #####################
+            for j in range(num_drones):     
+                    if obs_sensors[0][j][0] > ref_distance:
+                            TARGET_POS[j] = obs[j][0:3]+ np.array([STEP,0 , 0]) 
+                            TARGET_RPY[j] = [0,0,0]                                            
+                    else : 
+                            TARGET_POS[j] = TARGET_POS
+                            TARGET_RPY[j] = np.array([0, 0 , math.pi /2])
+  
             # applica i controlli in modo da raggiungere un certo punto con un certa velocità
             action[j, :], _, _ = ctrl[j].computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
                                                                     state=obs[j],
-                                                                    target_pos=np.hstack([TARGET_POS[wp_counters[j]]]),
-                                                                    # target_pos=INIT_XYZS[j, :] + TARGET_POS[wp_counters[j], :],
-                                                                    target_rpy=INIT_RPYS[j, :],
+                                                                    target_pos=TARGET_POS[j],
+                                                                    target_rpy=TARGET_RPY[j],
                                                                     target_vel = np.zeros((1,3))
                                                                     )
-        #### Genero la traiettoria #####################
-        for j in range(num_drones):     
-            if obs_sensors[j][2] > 2:
-                    NEXT_WP = [TARGET_POS[wp_counters[j]][0] ,TARGET_POS[wp_counters[j]][1] + STEP, TARGET_POS[wp_counters[j]][2]]
-                    wp_counters[j] = wp_counters[j]+1
-                    timer = 0
-                    TARGET_POS.append(NEXT_WP)   
-            else : 
-                wp_counters[j] = wp_counters[j]
+
+                    
+        
 
 
         #### Log the simulation ####################################
@@ -152,7 +164,7 @@ def run(
             logger.log(drone=j,
                        timestamp=i/env.CTRL_FREQ,
                        state=obs[j],
-                       control=np.hstack([TARGET_POS[wp_counters[j]][0:2], INIT_XYZS[j, 2], INIT_RPYS[j, :], np.zeros(6)])
+                       #control=np.hstack([TARGET_POS[wp_counters[j]][0:2], INIT_XYZS[j, 2], INIT_RPYS[j, :], np.zeros(6)])
                        # control=np.hstack([INIT_XYZS[j, :]+TARGET_POS[wp_counters[j], :], INIT_RPYS[j, :], np.zeros(6)])
                        )
         #### Printout ##############################################

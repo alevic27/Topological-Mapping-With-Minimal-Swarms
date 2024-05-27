@@ -3,7 +3,7 @@ import numpy as np
 import pybullet as p
 from gymnasium import spaces
 import pkg_resources
-
+import math
 from gym_pybullet_drones.envs.CtrlAviary import CtrlAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ImageType
 
@@ -94,10 +94,17 @@ class ProjAviary(CtrlAviary):
                          record=False, 
                          obstacles=True, 
                          user_debug_gui=True,
-                         vision_attributes=vision,
+                         # vision_attributes=vision,
                          output_folder=output_folder
                          )
         
+        #set Starting GUI POV
+        self.camera_distance = 4
+        self.camera_yaw = -90 # apparentemente così ci si mette in direzione x positiva
+        self.camera_pitch = -60     # (- np.pi/6)
+        self.camera_target_position =   [ 0 , 0 , 0.5 ]      # TODO set at self.initial_xyzs
+        p.resetDebugVisualizerCamera(self.camera_distance, self.camera_yaw, self.camera_pitch, self.camera_target_position)
+
         #### Set the image resoution to the desired one
         self.IMG_RES = img_res
 
@@ -110,9 +117,9 @@ class ProjAviary(CtrlAviary):
             self.sensor_position =np.zeros((4,3))
             self.sensor_direction = np.array([
                                         [1.0, 0.0, 0.0],  # front
-                                        [0.0, 1.0, 0.0],  # Lx                                        
+                                        [0.0, -1.0, 0.0],  # Lx                                        
                                         [-1.0, 0.0, 0.0],   # behind
-                                        [0.0, -1.0, 0.0],  # Rx
+                                        [0.0, 1.0, 0.0],  # Rx
                                         ])   
             # TODO piccolo check sul se serve inizializzare rot_mat    
         
@@ -143,37 +150,36 @@ class ProjAviary(CtrlAviary):
         """
         #TODO: define the logic through which we select the obstacles using the self.OBSTACLE_IDS variable
         # for the moment the function is the same as in BaseRLAviary.py
-        if self.VISION :
-            if self.LABYRINTH_ID == "0":
-                p.loadURDF("block.urdf",
+        
+        if self.LABYRINTH_ID == "0":
+            p.loadURDF("block.urdf",
                            [1, 0, .1],
                            p.getQuaternionFromEuler([0, 0, 0]),
                            physicsClientId=self.CLIENT
                            )
-                p.loadURDF("cube_small.urdf",
+            p.loadURDF("cube_small.urdf",
                            [0, 1, .1],
                            p.getQuaternionFromEuler([0, 0, 0]),
                            physicsClientId=self.CLIENT
                            )
-                p.loadURDF("duck_vhacd.urdf",
+            p.loadURDF("duck_vhacd.urdf",
                            [-1, 0, .1],
                            p.getQuaternionFromEuler([0, 0, 0]),
                            physicsClientId=self.CLIENT
                            )
-                p.loadURDF("teddy_vhacd.urdf",
+            p.loadURDF("teddy_vhacd.urdf",
                            [0, -1, .1],
                            p.getQuaternionFromEuler([0, 0, 0]),
                            physicsClientId=self.CLIENT
                            )
-            else:
-                p.loadURDF(pkg_resources.resource_filename('project','assets/'+'labyr'+self.LABYRINTH_ID+'.urdf'),
+        else:
+            p.loadURDF(pkg_resources.resource_filename('project','assets/'+'labyr'+self.LABYRINTH_ID+'.urdf'),
                        [0, 0, 0],
-                       p.getQuaternionFromEuler([0,0,0]),
+                       #p.getQuaternionFromEuler([0,0,0]),
+                       p.getQuaternionFromEuler([0,0,np.pi]),  # PROBLEMA : creare urdf con blender decide lui le posizioni e le direzioni quindi tocca inizializzare ogni singolo asset in qualche modo
                        useFixedBase = 1
                        )
-        else:
-            pass
-
+        
     # TODO def _addDecorations(self):
     # funzione più vasta di addObstacles che possa caricare vari dettagli che 
     # aiutino la caratterizzazione dell'environment per il riconoscimento
@@ -225,7 +231,7 @@ class ProjAviary(CtrlAviary):
     ################################################################################
         
     def _sensorsObs(self,
-                    nth_drone):
+                    ):               # aggiungere nth_drone???
         '''Returns distance from obstacles in the 4 directions # front Rx behind Lx 
         and cloud of up to 4 hit points
 
@@ -245,6 +251,12 @@ class ProjAviary(CtrlAviary):
         observation = np.array([[self.max_range,self.max_range,self.max_range,self.max_range] for j in range(self.NUM_DRONES)] )
         Hit_point = []
         if self.SENSOR_ATTR:
+            self.sensor_direction = np.array([
+                                        [1.0, 0.0, 0.0],  # front
+                                        [0.0, 1.0, 0.0],  # Lx                                        
+                                        [-1.0, 0.0, 0.0],   # behind
+                                        [0.0, -1.0, 0.0],  # Rx
+                                        ]) 
             for i in range(self.NUM_DRONES):
                 closest_hit = []
                 for j in range(self.NUM_SENSORS) :
