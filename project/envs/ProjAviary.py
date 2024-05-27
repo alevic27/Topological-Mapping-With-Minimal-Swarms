@@ -23,6 +23,7 @@ class ProjAviary(CtrlAviary):
                  ctrl_freq: int = 240,
                  gui=True,
                  vision=False,
+                 img_res: np.ndarray=np.array([64, 48]),
                  save_imgs=False,
                  obstacle_ids=False,
                  labyrinth_id: str = "0",
@@ -32,8 +33,7 @@ class ProjAviary(CtrlAviary):
                  #s_WF: int = -1,
                  #c_omega : float = 0,
                  #c_vel: float = 0,
-                 output_folder='results',
-                 img_res: np.ndarray=np.array([64, 48])
+                 output_folder='results'
                  ):
         """Initialization of an environment with drones capable of performing topological mapping.
 
@@ -63,14 +63,14 @@ class ProjAviary(CtrlAviary):
             Whether to use PyBullet's GUI.
         vision : bool, optional
             Whether to use the camera/vision sensor
+        img_res: numpy array, optional
+            Specify the resolution of the captured images
         save_imgs : bool, optional
             Whether to save pictures.
         obstacle_ids : list, optional
             Select how many and which obstacles/assets to add to the simulation
-        sensors_attributes : bool, optional
-            Whether to add rangefinders to the drone
-        img_res: numpy array, optional
-            Specify the resolution of the captured images
+        labyrinth_id : string, optional
+            Select the type of labyrinth to insert
         sensors_attributes : bool, optional
             mettere True se ci sono i RangeFinders
         max_sensors_range : float
@@ -93,12 +93,10 @@ class ProjAviary(CtrlAviary):
                          record=False, 
                          obstacles=True, 
                          user_debug_gui=True,
-                         # vision_attributes=vision,
                          output_folder=output_folder
                          )
         
         #### Create attributes for vision tasks ####################
-
         if self.VISION:
             self.IMG_RES = img_res
             self.IMG_FRAME_PER_SEC = 24
@@ -139,10 +137,12 @@ class ProjAviary(CtrlAviary):
         # Advance the simulation like in BaseAviary
         obs, reward, terminated, truncated, info = super().step(action)
 
-        #Add output from rangefinders 
-        obs_sensors=self._sensorsObs()
+        #Add output from rangefinders
+        if self.SENSOR_ATTR:
+            obs_sensors=self._sensorsObs()
+            self._storeHitPoints()
 
-        # TODO aggiungere il richiamo a _storeHitPoints(self)
+        # TODO definire _storeHitPoints(self)
 
         return obs, obs_sensors, reward, terminated, truncated, info
     
@@ -406,12 +406,11 @@ class ProjAviary(CtrlAviary):
         """
         return {"answer": 42} #### Calculated by the Deep Thought supercomputer in 7.5M years
 
-    def _storeHitPoints(self,
-                        nth_drone):
+    def _storeHitPoints(self):
         """Saves Cloud of points from Hit_point 
 
         Returns
         -------
         QUALCOSA
         """
-        return {"answer": 42}
+        pass
