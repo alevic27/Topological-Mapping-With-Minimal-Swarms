@@ -93,8 +93,7 @@ class MapAviary(ProjAviary):
         self.S_WF = s_WF             # wall following side: 1 for Right side, -1 for Left Side
         self.C_OMEGA = c_omega
         self.C_VEL=c_vel
-        self.NUM_SENSORS = 4
-        
+                
     ################################################################################
 
     def NextWP(self): #Aggiungere gli input necessari
