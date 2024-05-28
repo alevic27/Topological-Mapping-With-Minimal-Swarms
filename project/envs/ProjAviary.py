@@ -67,6 +67,11 @@ class ProjAviary(CtrlAviary):
             gittata RangeFinders (TODO CONTROLLARE SIA IN METRI)
         """
 
+        self.VISION = vision
+        self.SAVE = save_imgs
+        self.OBSTACLE_IDS = obstacle_ids
+        self.LABYRINTH_ID = labyrinth_id
+
         super().__init__(drone_model=drone_model,
                          num_drones=num_drones,
                          neighbourhood_radius=neighbourhood_radius,
@@ -80,12 +85,7 @@ class ProjAviary(CtrlAviary):
                          obstacles=True, 
                          user_debug_gui=True,
                          output_folder=output_folder
-                         )
-
-        self.VISION = vision
-        self.SAVE = save_imgs
-        self.OBSTACLE_IDS = obstacle_ids
-        self.LABYRINTH_ID = labyrinth_id
+                         )   
 
         #### Create attributes for vision tasks ####################
         if self.VISION:

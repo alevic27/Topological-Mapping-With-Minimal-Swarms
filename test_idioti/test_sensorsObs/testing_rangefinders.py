@@ -101,10 +101,6 @@ def run(
                       labyrinth_id = labyrinth_id,
                       sensors_attributes = True,
                       max_sensors_range = max_sensors_range,
-                      #ref_distance : int = 0,
-                      #s_WF: int = -1,
-                      #c_omega : float = 0,
-                      #c_vel: float = 0,
                       output_folder='results',
                     )
     #### Obtain the PyBullet Client ID from the environment ####
