@@ -134,12 +134,12 @@ class ProjAviary(CtrlAviary):
 
         #Add output from rangefinders
         if self.SENSOR_ATTR:
-            obs_sensors=self._sensorsObs()
+            observation, Hit_point = self._sensorsObs()
             self._storeHitPoints()
 
         # TODO definire _storeHitPoints(self)
 
-        return obs, obs_sensors, reward, terminated, truncated, info
+        return obs, observation, Hit_point, reward, terminated, truncated, info
     
     ###################################################################
         
