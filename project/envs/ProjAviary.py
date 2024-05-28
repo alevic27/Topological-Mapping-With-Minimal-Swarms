@@ -113,10 +113,10 @@ class ProjAviary(CtrlAviary):
             self.CLOUD_POINT = np.empty((0, 3))
             self.sensor_position =np.zeros((4,3))
             self.sensor_direction = np.array([
-                                        [1.0, 0.0, 0.0],  # front
-                                        [0.0, -1.0, 0.0],  # Lx                                        
-                                        [-1.0, 0.0, 0.0],   # behind
-                                        [0.0, 1.0, 0.0],  # Rx
+                                        [1.0, 0.0, 0.0],   # front
+                                        [0.0, 1.0, 0.0],   # Lx                                        
+                                        [-1.0, 0.0, 0.0],  # behind
+                                        [0.0, -1.0, 0.0],  # Rx                                       
                                         ])   
             # TODO piccolo check sul se serve inizializzare rot_mat    
         
@@ -258,9 +258,9 @@ class ProjAviary(CtrlAviary):
         Hit_point = np.array([[[np.inf , np.inf , np.inf] for j in range(self.NUM_SENSORS)]for i in range(self.NUM_DRONES)] )
         if self.SENSOR_ATTR:
             self.sensor_direction = np.array([
-                                        [1.0, 0.0, 0.0],  # front
-                                        [0.0, 1.0, 0.0],  # Lx                                        
-                                        [-1.0, 0.0, 0.0],   # behind
+                                        [1.0, 0.0, 0.0],   # front
+                                        [0.0, 1.0, 0.0],   # Lx                                        
+                                        [-1.0, 0.0, 0.0],  # behind
                                         [0.0, -1.0, 0.0],  # Rx
                                         ]) 
             for i in range(self.NUM_DRONES):         

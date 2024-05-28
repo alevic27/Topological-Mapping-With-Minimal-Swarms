@@ -123,14 +123,14 @@ def run(
     for i in range(0, int(duration_sec*env.CTRL_FREQ)):
 
         #### Step the simulation ###################################
-        obs, obs_sensors, reward, terminated, truncated, info = env.step(action)
+        obs, observation, Hit_point, reward, terminated, truncated, info = env.step(action)
 
         #### Compute control for the current way point #############
         for j in range(num_drones):
             
             #### Genero la traiettoria #####################
             #for j in range(num_drones):     
-                    if obs_sensors[0][j][0] > ref_distance:
+                    if observation[j][0] > ref_distance:
                             TARGET_POS[j] = obs[j][0:3]+ np.array([STEP,0 , 0]) 
                             TARGET_RPY[j] = TARGET_RPY                                            
                     else : 

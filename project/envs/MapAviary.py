@@ -26,7 +26,7 @@ class MapAviary(ProjAviary):
                  labyrinth_id: str = "0",
                  sensors_attributes = True,
                  max_sensors_range: float = np.inf,
-                 ref_distance : int = 0,
+                 ref_distance : float = 0.5,
                  s_WF: int = -1,
                  c_omega : float = 0,
                  c_vel: float = 0,
@@ -121,76 +121,88 @@ class MapAviary(ProjAviary):
     
     ################################################################################
 
-    def _WallFollowing(self,state):
+    def _WallFollowing(self,WFstate):    #ALG B.1
         """Funzione per seguire in modo allineato il muro -> tira fuori la rotazione desiderata da mandare ai controlli
-        la varibile state prende tre possibili valori:
-        - state = 0 ruotare per allinearsi al muro
-        - state = 1 ruotare e seguire il muro
-        - state = 2 ruotare attorno all'angolo
+        # TODO check gli help
         
+        Parameters
+        ---------
+        WFstate prende tre possibili valori:
+        - WFstate = 0 ruotare per allinearsi al muro
+        - WFstate = 1 ruotare e seguire il muro
+        - WFstate = 2 ruotare attorno all'angolo
+       
+        Returns
+        --------
+        omega: tipo
+            descrizione
+        vel: tipo
+            descrizione
+        WFstate: int
+            aggiorna il WFstate
         """
-        td = 0.02
+        td = 0.02           ## threshold distance to determine wether the drone is almost at reference distance from wall
+        sWF = self.S_WF     ## mi sa che tocca sia un vettore con un valore per ogni drone
         hit_distance,Hit_point,self.Min_dist= self._MinDistToWall(self)
-        sWF = self.S_WF
-        cw = self.C_OMEGA
-        cv = self.C_VEL
+        cw = self.C_OMEGA   ## mi sa che tocca sia un vettore con un valore per ogni drone
+        cv = self.C_VEL     ## mi sa che tocca sia un vettore con un valore per ogni drone
         self.beta = np.deg2rad(90 - self.alfa/2) #angolo tra rf e rs 
         omega = []
         vel = []
-        self.rf = [] 
-        self.rs = [] 
-        for j in range(self.NUM_DRONES) :
-
-            if hit_distance[j][1]!= self.max_range : 
-                self.rf.append(hit_distance[j][1]) # due range finders laterai
-                self.rs.append(hit_distance[j][21])
-            elif hit_distance[j][20]!=self.max_range :
-                self.rf.append(hit_distance [j][20])  #raggi esterni stereocamera/sensore di profondità 
-                self.rs.append(hit_distance[j][21])
-            else :
-                self.rf.append([self.max_range])
-                self.rs.append([self.max_range])
-            dR = self.Min_dist #minima distanza dal muro calcolata con RANSAC
-            if state == 0 :#ruoto per allinearmi al muro
-                omega.append([-1*sWF[j]*cw])
-                vel.append([0])
-                if np.abs(self.rs - self.rf * np.cos(self.beta)) < td :
-                    state = 1 # mi sono ruotato e ora voglio seguire il muro
-                if self.rf == self.max_range :
-                    state = 2 #mi giro ma non vedo più il muro quindi ci sta un angolo
-            elif state == 1 :#ruotare e seguire il muro
-                vel.append([cv])
-                Omega = self._WallFollowingandAllign(self)
-                omega.append(Omega)
-                if dR < self.DIST_WALL_REF :
-                    state = 0 #sono vicino al muro devo girare per allinearmi
-                if self.rf == self.max_range :
-                    state = 2 #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo
-            elif state == 2 :
-                vel.append([cv])
-                omega.append([sWF[j]*cv/self.DIST_WALL_REF])
-            if np.abs(self.rs - self.rf* np.cos(self.beta)) < 0.01 :
-                    state = 1 # ho agirato l'angolo e conttinuo a seguire il muro
-            if dR < self.DIST_WALL_REF:
-                    state = 0 #sto girando vedo il muro ma non sono allineato, mi devo girare    
+        self.rf = [] ## front distance to hit (observation)
+        self.rs = [] ##
+        for i in range(self.NUM_DRONES) :
+            for j in range(self.NUM_SENSORS) :
+                if hit_distance[i][1]!= self.max_range : 
+                    self.rf.append(hit_distance[j][1]) # due range finders laterai
+                    self.rs.append(hit_distance[j][21])
+                elif hit_distance[j][20]!=self.max_range :
+                    self.rf.append(hit_distance [j][20])  #raggi esterni stereocamera/sensore di profondità 
+                    self.rs.append(hit_distance[j][21])
+                else :
+                    self.rf.append([self.max_range])
+                    self.rs.append([self.max_range])
+                dR = self.Min_dist #minima distanza dal muro calcolata con RANSAC
+                if WFstate == 0 :#ruoto per allinearmi al muro
+                    omega.append([-1*sWF[j]*cw])
+                    vel.append([0])
+                    if np.abs(self.rs - self.rf * np.cos(self.beta)) < td :
+                        WFstate = 1 # mi sono ruotato e ora voglio seguire il muro
+                    if self.rf == self.max_range :
+                        WFstate = 2 #mi giro ma non vedo più il muro quindi ci sta un angolo
+                elif WFstate == 1 :#ruotare e seguire il muro
+                    vel.append([cv])
+                    Omega = self._WallFollowingandAllign(self)
+                    omega.append(Omega)
+                    if dR < self.DIST_WALL_REF :
+                        WFstate = 0 #sono vicino al muro devo girare per allinearmi
+                    if self.rf == self.max_range :
+                        WFstate = 2 #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo
+                elif WFstate == 2 :
+                    vel.append([cv])
+                    omega.append([sWF[j]*cv/self.DIST_WALL_REF])
+                if np.abs(self.rs - self.rf* np.cos(self.beta)) < 0.01 :
+                        WFstate = 1 # ho agirato l'angolo e conttinuo a seguire il muro
+                if dR < self.DIST_WALL_REF:
+                        WFstate = 0 #sto girando vedo il muro ma non sono allineato, mi devo girare    
         
-        return omega , vel , state
+        return omega , vel , WFstate
     
     ################################################################################
 
-    def _WallFollowingandAllign(self):
+    def _WallFollowingandAllign(self):     #ALG B.2
         """funzione per seguire il muro -> mi da la omega mentre sto navigando vicino al muro per evitare di allontanarmi dal muro
         
         """
         td = 0.02
         omega=[]
         for j in range(self.NUM_DRONES):
-            if np.abs(self.DIST_WALL_REF-self.Min_dist[j]) > td :#sono lontano da td
+            if np.abs(self.DIST_WALL_REF-self.Min_dist[j]) > td :#sono lontano dalla distanza desiderata
                 if self.DIST_WALL_REF-self.Min_dist[j] > td :
                     omega.append([self.S_WF*self.C_OMEGA]) # molto lontano dal muro
                 else : 
                     omega.append([-self.S_WF*self.C_OMEGA]) #troppo vicino al muro
-            elif np.abs(self.DIST_WALL_REF-self.Min_dist[j]) < td :#sono vicino al td
+            elif np.abs(self.DIST_WALL_REF-self.Min_dist[j]) < td :#sono vicino alla distanza desiderata
                 if self.rs[j] > self.rf[j]*np.cos(self.beta):
                       omega.append([self.S_WF*self.C_OMEGA])
                 else : 
@@ -204,12 +216,29 @@ class MapAviary(ProjAviary):
 
     def _MinDistToWall(self):
         """Distanza minima dall'ostacolo 
-        
+        richiede sWF per capire da che lato  (e faccio che la aggiorna???)
+
         """
         observation, Hit_point = self._sensorsObs()
         distance=[]
+        sWF = self.S_WF   #  da mettere ?????????
         for i in range(self.NUM_DRONES):
-            for j in range(observation[i][0 : 19]):
+            rF = observation[i][0] # distanza frontale
+            rL = observation[i][1] # distanza sinistra
+            rR = observation[i][3] # distanza destra
+            if sWF == 1: # wall following con muro sulla mia destra , devo trovare le distanze N-E e S-E
+                alfa = np.arctan(rF/rR) #complementare dell'angolo di "raddrizzamento" rispetto al muro
+                distance = rF * np.cos(alfa)
+            elif sWF == -1: # wall following con muro sulla mia sinistra , devo trovare le distanze N-O e S-O
+                alfa = np.arctan(rF/rL) #complementare dell'angolo di "raddrizzamento" rispetto al muro
+                distance = rF * np.cos(alfa)
+
+                
+
+
+        '''
+        for i in range(self.NUM_DRONES):
+            for j in range(observation[i][j]):
                 if observation[i][j] < self.max_range:
                    hit_point = Hit_point[i][j]
             if hit_point == []:
@@ -225,5 +254,5 @@ class MapAviary(ProjAviary):
 
                 # Valuta la distanza da ogni punto alla retta
                 distance.append([np.abs(slope * x1 - y1 + intercept) / np.sqrt(slope**2 + 1)])
-        
+        '''
         return observation, Hit_point , distance

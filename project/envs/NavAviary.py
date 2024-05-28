@@ -136,7 +136,7 @@ class NavAviary(CtrlAviary):
             for j in range(observation[i][0 : 19]):
                 if observation[i][j] < self.max_range:
                    hit_point = Hit_point[i][j]
-            if hit_point == []:
+            if hit_point == []: # nessun sensore trova hit
                 distance.append ([])
             else : 
                 idx = np.random.choice(len(hit_point), 2, replace=False)
@@ -181,7 +181,7 @@ class NavAviary(CtrlAviary):
     '''
 
     def _WallFollowing(self,state):
-        td = 0.02
+        td = 0.02       
         hit_distance,Hit_point,self.Min_dist= self._MinDistToWall(self)
         sWF = self.sWF
         cw =self.comega
@@ -189,7 +189,7 @@ class NavAviary(CtrlAviary):
         self.beta = np.deg2rad(90 - self.alfa/2) #angolo tra rf e rs 
         omega = []
         vel = []
-        self.rf = [] 
+        self.rf = []  
         self.rs = [] 
         for j in range(self.NUM_DRONES) :
 
