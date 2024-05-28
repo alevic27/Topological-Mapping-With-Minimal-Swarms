@@ -252,7 +252,7 @@ class ProjAviary(CtrlAviary):
             tiene [ 0 0 0] se non ha hittato in quello step
             TODO: sviluppare qualcosa che salva i 4 punti in Hit_point a ogni step
         '''
-        observation = np.array([[self.max_range,self.max_range,self.max_range,self.max_range] for i in range(self.NUM_DRONES)] )
+        observation = np.array([[self.MAX_RANGE,self.MAX_RANGE,self.MAX_RANGE,self.MAX_RANGE] for i in range(self.NUM_DRONES)] )
         Hit_point = []
         Hit_point = np.array([[[np.inf , np.inf , np.inf] for j in range(self.NUM_SENSORS)]for i in range(self.NUM_DRONES)] )
         if self.SENSOR_ATTR:
@@ -267,7 +267,7 @@ class ProjAviary(CtrlAviary):
                 self.rot_mat = np.array(p.getMatrixFromQuaternion(self.quat[i, :])).reshape(3, 3) #TODO vedi ste cazzo di rotazioni
                 self.sensor_direction = np.dot(self.sensor_direction,self.rot_mat)
                 self.from_positions = np.tile(self.sensor_position, (4, 1))
-                self.to_positions = np.array([self.sensor_position + direction * self.max_range[0] for direction in self.sensor_direction])
+                self.to_positions = np.array([self.sensor_position + direction * self.MAX_RANGE[0] for direction in self.sensor_direction])
                 result =p.rayTestBatch(self.from_positions, self.to_positions)
                 for j in range(self.NUM_SENSORS) :
                     ##  Hit fraction: {result[2]}")
@@ -276,7 +276,7 @@ class ProjAviary(CtrlAviary):
                         #closest_hit[j][0] = result_list[j][0]
                     # Se c'è un punto di contatto, ottieni la distanza
                     if result[j][0] != -1:
-                        hit_distance = result[j][2]*self.max_range[0]
+                        hit_distance = result[j][2]*self.MAX_RANGE[0]
                         hit_point = result[j][3]
                         # Aggiungi la distanza rilevata come osservazione
                         observation[i][j]= hit_distance
@@ -284,7 +284,7 @@ class ProjAviary(CtrlAviary):
                         Hit_point [i][j] = hit_point
                     else:
                         # Se non ci sono oggetti rilevati, assegna una distanza massima
-                        observation[i][j] =  self.max_range[0]
+                        observation[i][j] =  self.MAX_RANGE[0]
                         #Hit_point.append([])
         return observation, Hit_point
         
