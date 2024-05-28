@@ -110,6 +110,7 @@ class ProjAviary(CtrlAviary):
         if self.SENSOR_ATTR :
             self.MAX_RANGE = max_sensors_range
             self.NUM_SENSORS = 4
+            self.CLOUD_POINT = np.empty((0, 3))
             self.sensor_position =np.zeros((4,3))
             self.sensor_direction = np.array([
                                         [1.0, 0.0, 0.0],  # front
@@ -135,7 +136,7 @@ class ProjAviary(CtrlAviary):
         #Add output from rangefinders
         if self.SENSOR_ATTR:
             observation, Hit_point = self._sensorsObs()
-            self._storeHitPoints()
+            self._storeHitPoints(Hit_point)
 
         # TODO definire _storeHitPoints(self)
 
@@ -249,7 +250,7 @@ class ProjAviary(CtrlAviary):
                                      se non trova niente prende valore max_range
         Hit_point 
             (NUM_DRONES , NUM_SENSORS, 3)-shaped array con lista di punti rilevati dai rangefinders
-            tiene [ 0 0 0] se non ha hittato in quello step
+            tiene [inf inf inf] se non ha hittato in quello step
             TODO: sviluppare qualcosa che salva i 4 punti in Hit_point a ogni step
         '''
         observation = np.array([[self.MAX_RANGE,self.MAX_RANGE,self.MAX_RANGE,self.MAX_RANGE] for i in range(self.NUM_DRONES)] )
@@ -346,15 +347,25 @@ class ProjAviary(CtrlAviary):
     
     ################################################################################
 
-    def _storeHitPoints(self):
-        """Saves Cloud of points from Hit_point 
+    def _storeHitPoints(self,
+                        Hit_point: np.ndarray
+                        ):
+        """Saves every hit point found with sensor_Obs in the alreasy initialized self.CLOUD_POINT value
+        Parameters
+        -------
+        Hit_point 
+            (NUM_DRONES , NUM_SENSORS, 3)-shaped array con lista di punti rilevati dai rangefinders
+            tiene [inf inf inf] se non ha hittato
 
         Returns
         -------
         QUALCOSA
         """
-        pass
-    
+
+        for i in range(self.NUM_DRONES):
+            for j in range(self.NUM_SENSORS):
+                self.CLOUD_POINT = np.vstack((self.CLOUD_POINT, Hit_point[i][j])) if np.all(np.isfinite(Hit_point[i][j])) else self.CLOUD_POINT
+
     ################################################################################
 
     def _computeReward(self):
