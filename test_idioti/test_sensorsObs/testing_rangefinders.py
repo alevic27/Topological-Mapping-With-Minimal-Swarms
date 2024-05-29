@@ -123,7 +123,7 @@ def run(
     for i in range(0, int(duration_sec*env.CTRL_FREQ)):
 
         #### Step the simulation ###################################
-        obs, observation, Hit_point, reward, terminated, truncated, info = env.step(action)
+        obs, observation, reward, terminated, truncated, info = env.step(action)
 
         #### Compute control for the current way point #############
         for j in range(num_drones):
