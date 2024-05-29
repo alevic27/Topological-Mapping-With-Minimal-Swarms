@@ -28,9 +28,10 @@ class MapAviary(ProjAviary):
                  max_sensors_range: float = np.inf,
                  ref_distance : float = 0.5,
                  s_WF: int = -1,
-                 c_omega : float = 0,
-                 c_vel: float = 0,
-                 output_folder='results'
+                 c_omega : float = 0.,
+                 c_vel: float = 0.,
+                 output_folder='results',
+                 WFstate : int = 0,
                  ):
         
         """Initialization of an environment with drones capable of performing topological mapping.
@@ -90,10 +91,12 @@ class MapAviary(ProjAviary):
                          )
         
         self.DIST_WALL_REF = ref_distance  # distanza di riferimento dal muro
-        self.S_WF = s_WF             # wall following side: 1 for Right side, -1 for Left Side
+        self.S_WF = s_WF             # wall following side: 1 for wall on Right side, -1 for wall on Left Side
         self.C_OMEGA = c_omega
         self.C_VEL=c_vel
-                
+        self.WFSTATE = WFstate
+        self.PREV_DIST = np.array([[] for j in range(self.NUM_DRONES)])
+
     ################################################################################
 
     def NextWP(self): #Aggiungere gli input necessari
@@ -190,27 +193,46 @@ class MapAviary(ProjAviary):
     
     ################################################################################
 
-    def _WallFollowingandAllign(self):     #ALG B.2
-        """funzione per seguire il muro -> mi da la omega mentre sto navigando vicino al muro per evitare di allontanarmi dal muro
-        
-        """
+    def _WallFollowingandAlign(self):     #ALG B.2
         td = 0.02
         omega=[]
         for j in range(self.NUM_DRONES):
-            if np.abs(self.DIST_WALL_REF-self.Min_dist[j]) > td :#sono lontano dalla distanza desiderata
-                if self.DIST_WALL_REF-self.Min_dist[j] > td :
-                    omega.append([self.S_WF*self.C_OMEGA]) # molto lontano dal muro
+            if np.abs(self.distWallRef-self.Min_dist[j]) > td :#sono lontano da td
+                if self.distWallRef-self.Min_dist[j] > td :
+                    omega.append([self.sWF*self.comega]) # molto lontano dal muro
                 else : 
-                    omega.append([-self.S_WF*self.C_OMEGA]) #troppo vicino al muro
-            elif np.abs(self.DIST_WALL_REF-self.Min_dist[j]) < td :#sono vicino alla distanza desiderata
+                    omega.append([-self.sWF*self.comega]) #troppo vicino al muro
+            elif np.abs(self.distWallRef-self.Min_dist[j]) < td :#sono vicino al td
                 if self.rs[j] > self.rf[j]*np.cos(self.beta):
-                      omega.append([self.S_WF*self.C_OMEGA])
+                      omega.append([self.sWF*self.comega])
                 else : 
-                     omega.append([-self.S_WF*self.C_OMEGA])
+                     omega.append([-self.sWF*self.comega])
             else :
                  omega.append([0])
-        
         return omega
+    
+    def _WallFollowingandAlign2(self):     #ALG B.2  versione con solo il sensore davanti, credo necessiti di un meccanismo di memoria
+        """funzione per seguire il muro -> mi da la omega mentre sto navigando vicino al muro per evitare di allontanarmi dal muro
+        
+        """
+        
+        td = 0.02
+        omega=np.array([[0] for j in range(self.NUM_DRONES)] )
+        for j in range(self.NUM_DRONES):
+            if np.abs(self.DIST_WALL_REF-self.Min_dist[j]) > td :# sono lontano dalla distanza desiderata
+                if self.DIST_WALL_REF-self.Min_dist[j] > td :    # troppo lontano dal muro
+                    omega[j] = ([self.S_WF*self.C_OMEGA])        # TODO check sign
+                else :                                           # troppo vicino al muro
+                    omega[j] = ([-self.S_WF*self.C_OMEGA])       
+            elif np.abs(self.DIST_WALL_REF-self.Min_dist[j]) < td :#sono vicino alla distanza desiderata
+                if self.rs[j] > self.rf[j]*np.cos(self.beta):
+                    omega[j] = ([self.S_WF*self.C_OMEGA])
+                else : 
+                    omega[j] = ([-self.S_WF*self.C_OMEGA])
+            else :
+                omega[j] = ([0])
+        
+        return omega    
     
     ################################################################################
 
@@ -225,16 +247,28 @@ class MapAviary(ProjAviary):
         for i in range(self.NUM_DRONES):
             rF = observation[i][0] # distanza frontale
             rL = observation[i][1] # distanza sinistra
+            rB = observation[i][2] # distanza retro
             rR = observation[i][3] # distanza destra
-            if sWF == 1: # wall following con muro sulla mia destra , devo trovare le distanze N-E e S-E
-                alfa = np.arctan(rF/rR) #complementare dell'angolo di "raddrizzamento" rispetto al muro
-                distance = rF * np.cos(alfa)
-            elif sWF == -1: # wall following con muro sulla mia sinistra , devo trovare le distanze N-O e S-O
-                alfa = np.arctan(rF/rL) #complementare dell'angolo di "raddrizzamento" rispetto al muro
-                distance = rF * np.cos(alfa)
-
-                
-
+            if sWF == 1: # se wall following con muro sulla mia destra , devo trovare le distanze N-E e S-E
+                NEalfa = np.arctan(rF/rR) # complementare dell'angolo di "raddrizzamento" rispetto al muro
+                SEalfa = np.arctan(rB/rR) # stessa ma dietro
+                NEdistance = rF * np.cos(NEalfa)
+                SEdistance = rB * np.cos(SEalfa)
+                distance = min(NEdistance, SEdistance) # minimo tra le due distanze
+                        ### (una in genere è inf a meno che non siamo vicino a uno spigolo e posso sfruttare ciò)
+            elif sWF == -1: # se wall following con muro sulla mia sinistra , devo trovare le distanze N-O e S-O
+                NWalfa = np.arctan(rF/rL) #complementare dell'angolo di "raddrizzamento" rispetto al muro
+                SWalfa = np.arctan(rB/rL) #complementare dell'angolo di "raddrizzamento" rispetto al muro
+                NWdistance = rF * np.cos(NWalfa)
+                SWdistance = rB * np.cos(SWalfa)
+                distance = min(NWdistance, SWdistance) #distanza perpendicolare che però potrebbe essere vuota per la questione OoR
+            if distance == []:
+                if sWF == 1:
+                    distance = rR
+                elif sWF == -1:
+                    distance = rL
+            self.PREV_DIST[i] = distance
+        return observation, Hit_point , distance
 
         '''
         for i in range(self.NUM_DRONES):
@@ -254,5 +288,6 @@ class MapAviary(ProjAviary):
 
                 # Valuta la distanza da ogni punto alla retta
                 distance.append([np.abs(slope * x1 - y1 + intercept) / np.sqrt(slope**2 + 1)])
-        '''
+        
         return observation, Hit_point , distance
+        '''

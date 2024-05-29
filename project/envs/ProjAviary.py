@@ -140,7 +140,7 @@ class ProjAviary(CtrlAviary):
 
         # TODO definire _storeHitPoints(self)
 
-        return obs, observation, Hit_point, reward, terminated, truncated, info
+        return obs, observation, reward, terminated, truncated, info
     
     ###################################################################
         
