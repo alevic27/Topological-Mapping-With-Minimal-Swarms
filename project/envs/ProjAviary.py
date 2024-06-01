@@ -128,8 +128,9 @@ class ProjAviary(CtrlAviary):
         """Advances the environment by one simulation step.
         Output
         ----------
-        obs_sensors : 
-            gittata RangeFinders (TODO CONTROLLARE SIA IN METRI)"""
+        observation : ndarray
+            (NUM_DRONES, 4)-shaped array containing the front/right/back/left distance observed        
+        """
         # Advance the simulation like in BaseAviary
         obs, reward, terminated, truncated, info = super().step(action)
 
@@ -266,7 +267,7 @@ class ProjAviary(CtrlAviary):
             for i in range(self.NUM_DRONES):         
                 self.sensor_position = self._getDroneStateVector(i)[0:3]  # [1. 1. 1.] posizione
                 self.rot_mat = np.array(p.getMatrixFromQuaternion(self.quat[i, :])).reshape(3, 3) #TODO vedi ste cazzo di rotazioni
-                self.sensor_direction = np.dot(self.sensor_direction,self.rot_mat)
+                self.sensor_direction = np.dot(self.sensor_direction,self.rot_mat.T)   
                 self.from_positions = np.tile(self.sensor_position, (4, 1))
                 self.to_positions = np.array([self.sensor_position + direction * self.MAX_RANGE[0] for direction in self.sensor_direction])
                 result =p.rayTestBatch(self.from_positions, self.to_positions)

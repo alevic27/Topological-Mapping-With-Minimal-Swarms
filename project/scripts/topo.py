@@ -91,7 +91,7 @@ def run(
         obs, reward, terminated, truncated, info = env.step(action)
 
         #### Compute control for the current way point #############
-        # target_pos, target_psy = env.wallFollowing(state)
+        # target_pos, target_rpy = env.wallFollowing(state)
         
         #wall follow che determina target pos e target rpy che verrà poi elaborata dal controllo (ctrl[j].computeControlFromState)
 
