@@ -130,13 +130,13 @@ class NavAviary(CtrlAviary):
     ################################################################################
     # distanza minima dall'ostacolo 
     def _MinDistToWall(self):
-        observation, Hit_point = _sensorsObs(self)
+        observation, Hit_point = self._sensorsObs()
         distance=[]
         for i in range(self.NUM_DRONES):
             for j in range(observation[i][0 : 19]):
                 if observation[i][j] < self.max_range:
                    hit_point = Hit_point[i][j]
-            if hit_point == []:
+            if hit_point == []: # nessun sensore trova hit
                 distance.append ([])
             else : 
                 idx = np.random.choice(len(hit_point), 2, replace=False)
@@ -153,7 +153,7 @@ class NavAviary(CtrlAviary):
     ################################################################################
     # funzione per seguire il muro -> mi da la omega mentre sto navigando vicino al muro 
     # per evitare di allontanarmi dal muro
-    def _WallFollowingandAllign(self):
+    def _WallFollowingAndAlign(self):
         td = 0.02
         omega=[]
         for j in range(self.NUM_DRONES):
@@ -174,14 +174,14 @@ class NavAviary(CtrlAviary):
     ################################################################################     
     # funzione per seguire in modo allineato il muro -> tira fuori la rotazione 
     # desiderata da mandare ai controlli
-    ''' la varibile rotate prende tre possibili valori
+    ''' la varibile state prende tre possibili valori
         state = 0 ruotare per allinearsi al muro
         state = 1 ruotare e seguire il muro
         state = 2 ruotare attorno all'angolo
     '''
 
     def _WallFollowing(self,state):
-        td = 0.02
+        td = 0.02       
         hit_distance,Hit_point,self.Min_dist= self._MinDistToWall(self)
         sWF = self.sWF
         cw =self.comega
@@ -189,7 +189,7 @@ class NavAviary(CtrlAviary):
         self.beta = np.deg2rad(90 - self.alfa/2) #angolo tra rf e rs 
         omega = []
         vel = []
-        self.rf = [] 
+        self.rf = []  
         self.rs = [] 
         for j in range(self.NUM_DRONES) :
 
