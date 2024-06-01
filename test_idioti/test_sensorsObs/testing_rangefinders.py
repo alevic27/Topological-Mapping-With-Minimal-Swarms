@@ -68,7 +68,7 @@ def run(
     #posizione e velocità iniziale per ogni drone 
     INIT_XYZS = np.array([[X_ini,Y_ini+i*Y_STEP_ini, H_ini] for i in range(num_drones)])
     # INIT_RPYS = np.array([[0, 0, i * (np.pi/2)/num_drones] for i in range(num_drones)])
-    INIT_RPYS = np.array([[0, 0, 0 * (np.pi/2)] ])
+    INIT_RPYS = np.array([[0., 0., 0 * (np.pi/2)] ])
 
 
      
