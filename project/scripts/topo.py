@@ -7,7 +7,7 @@ import numpy as np
 import csv
 
 from gym_pybullet_drones.utils.Logger import Logger
-from project.envs.TopoAviary import TopoAviary
+from project.envs.MapAviary import MapAviary
 from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
 from gym_pybullet_drones.utils.utils import sync, str2bool
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType
@@ -22,22 +22,22 @@ DEFAULT_ACT = ActionType('one_d_rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' o
 DEFAULT_AGENTS = 2
 
 DEFAULT_DRONES = DroneModel("cf2x")
+DEFAULT_NUM_DRONES = 1
 DEFAULT_PHYSICS = Physics("pyb")
 DEFAULT_GUI = True
 DEFAULT_PLOT = True
-DEFAULT_SIMULATION_FREQ_HZ = 100
-DEFAULT_CONTROL_FREQ_HZ = 100
-DEFAULT_DURATION_SEC = 30
-DEFAULT_NUM_DRONES = 1
+DEFAULT_SIMULATION_FREQ_HZ = 240
+DEFAULT_CONTROL_FREQ_HZ = 48
+DEFAULT_DURATION_SEC = 60
+
 DEFAULT_IMG_RES = np.array([64, 48])
 
+DEFAULT_SENSORS_ATTRIBUTES = True
+DEFAULT_SENSORS_RANGE = 4.
+DEFAULT_REF_DISTANCE = 0.3
 DEFAULT_LABYRINTH_ID = "2t"  # "0" per i 4 oggettini di BaseRLAviary, "lettera" della versione del labirinto 
 
 def run(
-        output_folder=DEFAULT_OUTPUT_FOLDER,
-        colab=DEFAULT_COLAB, 
-        record_video=DEFAULT_SAVE_IMAGES, 
-        local=True,
         drone=DEFAULT_DRONES,
         num_drones=DEFAULT_NUM_DRONES,
         physics=DEFAULT_PHYSICS,
@@ -46,29 +46,56 @@ def run(
         simulation_freq_hz=DEFAULT_SIMULATION_FREQ_HZ,
         control_freq_hz=DEFAULT_CONTROL_FREQ_HZ,
         duration_sec=DEFAULT_DURATION_SEC,
+        sensors_attributes= DEFAULT_SENSORS_ATTRIBUTES,
+        max_sensors_range = DEFAULT_SENSORS_RANGE,
+        ref_distance = DEFAULT_REF_DISTANCE,
         labyrinth_id=DEFAULT_LABYRINTH_ID,
+        output_folder=DEFAULT_OUTPUT_FOLDER,
+        colab=DEFAULT_COLAB,
+
         ):
     
     ### definisci le posizioni iniziali dei droni
+    H_ini = 1.
+    X_ini = 0
+    Y_ini = 0
+    Y_STEP_ini = .05
+    #posizione e attitude iniziale per ogni drone 
+    INIT_XYZS = np.array([[X_ini,Y_ini+i*Y_STEP_ini, H_ini] for i in range(num_drones)])
+    INIT_RPYS = np.array([[0., 0., 0.] for i in range(num_drones)])
+    
+    ### WP target
 
-    INIT_XYZ = np.array([[3, 0, 1] for i in range(1,num_drones+1)])
-    INIT_RPY = np.array([[.0, .0, .0] for _ in range(num_drones)])
-    env = TopoAviary(drone_model=drone,
-                     num_drones=num_drones,
-                     initial_xyzs=INIT_XYZ,
-                     initial_rpys=INIT_RPY,
-                     physics=physics,
-                     pyb_freq=simulation_freq_hz,
-                     ctrl_freq=control_freq_hz,
-                     gui=gui,   
-                     record=DEFAULT_SAVE_IMAGES,
-                     labyrinth_id=labyrinth_id,
-                     obs=DEFAULT_OBS,    
-                     img_res=DEFAULT_IMG_RES                
-                     )
+    timer = 0
+    #for i in range(NUM_WP):
+    #    TARGET_POS[i,:]= X_ini + i*(X_target-X_ini)/NUM_WP,Y_ini + i* (Y_target-Y_ini)/NUM_WP, H_target
+    wp_counters = np.array([0 for i in range(num_drones)])  #comodo quando si fisseranno i primi nodi
+    
+    env = MapAviary(drone_model=drone,
+                    num_drones=num_drones,
+                    neighbourhood_radius=10,
+                    initial_xyzs=INIT_XYZS,
+                    initial_rpys=INIT_RPYS,
+                    physics=physics,
+                    pyb_freq=simulation_freq_hz,
+                    ctrl_freq=control_freq_hz,
+                    gui=gui,   
+                    vision = False,
+                    img_res  = np.array([64, 48]),
+                    save_imgs=False,
+                    obstacle_ids=False,
+                    labyrinth_id = labyrinth_id,
+                    #record=DEFAULT_SAVE_IMAGES,
+                    sensors_attributes = sensors_attributes,
+                    max_sensors_range = max_sensors_range,
+                    ref_distance = ref_distance,
+                    output_folder='output_folder',
+                                   
+                    )
     
     #### Initialize the controllers ############################
-    ctrl = [DSLPIDControl(drone_model=drone) for i in range(num_drones)]
+    if drone in [DroneModel.CF2X, DroneModel.CF2P]:
+        ctrl = [DSLPIDControl(drone_model=drone) for i in range(num_drones)]
 
     #### Obtain the PyBullet Client ID from the environment ####
     PYB_CLIENT = env.getPyBulletClient()
@@ -84,33 +111,24 @@ def run(
     #### Run the simulation ####################################
     action = np.zeros((num_drones,4))
     START = time.time()
-
     for i in range(0, int(duration_sec*env.CTRL_FREQ)):
 
         #### Step the simulation ###################################
-        obs, reward, terminated, truncated, info = env.step(action)
+        obs, observation, reward, terminated, truncated, info = env.step(action)
 
         #### Compute control for the current way point #############
-        # target_pos, target_rpy = env.wallFollowing(state)
-        
-        #wall follow che determina target pos e target rpy che verrà poi elaborata dal controllo (ctrl[j].computeControlFromState)
+        TARGET_POS , TARGET_RPY , TARGET_VEL , TARGET_OMEGA = env.NextWP(obs,observation)        
 
-        for j in range(num_drones):
+        # applica i controlli in modo da raggiungere un certo punto con un certa velocità
+        for j in range(num_drones) :
             action[j, :], _, _ = ctrl[j].computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
                                                                     state=obs[j],
-                                                                    target_pos=INIT_XYZ[j, :],
-                                                                    target_rpy=INIT_RPY[j, :]
+                                                                    target_pos=TARGET_POS[j],
+                                                                    target_rpy=TARGET_RPY[j],
+                                                                    target_vel = TARGET_VEL[j],
+                                                                    target_rpy_rates = TARGET_OMEGA[j]
                                                                     )
-        '''
-        print('PRINTANDO obs')
-        print(obs)
-        print('PRINTANDO obs.shape')
-        print(obs.shape)
-        print('PRINTANDO obs[0]')
-        state = obs[0]
-        print(state)
-        '''
-
+       
         #### Log the simulation ####################################
         for j in range(num_drones):
             logger.log(drone=j,
@@ -148,12 +166,12 @@ if __name__ == "__main__":
     parser.add_argument('--num_drones',         default=DEFAULT_NUM_DRONES,          type=int,           help='Number of drones (default: 3)', metavar='')
     parser.add_argument('--physics',            default=DEFAULT_PHYSICS,      type=Physics,       help='Physics updates (default: PYB)', metavar='', choices=Physics)
     parser.add_argument('--gui',                default=DEFAULT_GUI,       type=str2bool,      help='Whether to use PyBullet GUI (default: True)', metavar='')
-    parser.add_argument('--record_video',       default=DEFAULT_SAVE_IMAGES,      type=str2bool,      help='Whether to record a video (default: False)', metavar='')
+#    parser.add_argument('--record_video',       default=DEFAULT_SAVE_IMAGES,      type=str2bool,      help='Whether to record a video (default: False)', metavar='')
     parser.add_argument('--plot',               default=DEFAULT_PLOT,       type=str2bool,      help='Whether to plot the simulation results (default: True)', metavar='')
     parser.add_argument('--simulation_freq_hz', default=DEFAULT_SIMULATION_FREQ_HZ,        type=int,           help='Simulation frequency in Hz (default: 240)', metavar='')
     parser.add_argument('--control_freq_hz',    default=DEFAULT_CONTROL_FREQ_HZ,         type=int,           help='Control frequency in Hz (default: 48)', metavar='')
     parser.add_argument('--duration_sec',       default=DEFAULT_DURATION_SEC,         type=int,           help='Duration of the simulation in seconds (default: 5)', metavar='')
-    parser.add_argument('--output_folder',     default=DEFAULT_OUTPUT_FOLDER, type=str,           help='Folder where to save logs (default: "results")', metavar='')
+    parser.add_argument('--output_folder',      default=DEFAULT_OUTPUT_FOLDER, type=str,           help='Folder where to save logs (default: "results")', metavar='')
     parser.add_argument('--colab',              default=DEFAULT_COLAB, type=bool,           help='Whether example is being run by a notebook (default: "False")', metavar='')
     ARGS = parser.parse_args()
 

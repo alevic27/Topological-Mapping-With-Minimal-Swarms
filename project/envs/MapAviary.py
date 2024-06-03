@@ -16,6 +16,7 @@ class MapAviary(ProjAviary):
                  neighbourhood_radius: float=np.inf,
                  initial_xyzs=None,
                  initial_rpys=None,
+                 physics: Physics = Physics.PYB,
                  pyb_freq: int = 240,
                  ctrl_freq: int = 240,
                  gui=True,
@@ -29,7 +30,7 @@ class MapAviary(ProjAviary):
                  ref_distance : float = 0.5,
                  s_WF: int = -1,
                  c_omega : float = 0.,
-                 c_vel: float = 0.,
+                 c_vel: float = 0.1,
                  output_folder='results',
                  WFstate : int = 0,
                  ):
@@ -76,7 +77,7 @@ class MapAviary(ProjAviary):
                          neighbourhood_radius=neighbourhood_radius,
                          initial_xyzs=initial_xyzs,
                          initial_rpys=initial_rpys,
-                         physics=Physics.PYB,
+                         physics= physics,
                          pyb_freq=pyb_freq,
                          ctrl_freq=ctrl_freq,
                          gui=gui,
@@ -96,102 +97,47 @@ class MapAviary(ProjAviary):
         self.C_VEL=c_vel        # output sulla velocità di controllo per il raddrizzamento
         self.WFSTATE = np.array([[WFstate] for j in range(self.NUM_DRONES)])
         self.PREV_DIST = np.array([[] for j in range(self.NUM_DRONES)])
-        
+        self.CTRL_FREQ = ctrl_freq 
+        self.MAX_RANGE = max_sensors_range
     ################################################################################
 
-    def NextWP(self): #Aggiungere gli input necessari
+    def NextWP(self,obs,observation): #Aggiungere gli input necessari
         """Definisce la logica di navigazione trovando il prossimo WP usando le funzioni:
-        - _WallFollowing()  , il quale chiama _WallFollowingAndAlign()
         - _DecisionSystem
-        
+        - _WallFollowing()  , il quale chiama _WallFollowingAndAlign()
         """
-
-        #TODO: definire funzione
-        TARGET_POS = []
-        TARGET_RPY = []
-        return TARGET_POS, TARGET_RPY
-
+        self.observation = observation
+        TARGET_POS = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
+        TARGET_RPY = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
+        time_step  = 1 / self.CTRL_FREQ
+        #self.S_WF=self._decisionSystem()  # controllare se aggiornare in self o no
+        TARGET_OMEGA, TARGET_VEL , self.WFSTATE = self._WallFollowing()
+        for i in range(self.NUM_DRONES) :
+            TARGET_POS[i][0]   = obs[i][0]    + TARGET_VEL[i] * time_step  # solo i primi due
+            TARGET_POS[i][1:3] = obs[i][1:3]
+            #print(obs[i][0:3])
+            #print(TARGET_POS[i][0:3])
+            TARGET_RPY[i][0:2] = obs[i][7:9]   
+            TARGET_RPY[i][2]   = obs[i][9]   + TARGET_OMEGA[i] * time_step # solo il terzo elemento
+        #print(obs[i][0:3])
+        #print(TARGET_POS[0])
+        for j in range(self.NUM_DRONES) :
+            self.distance[j][0] =  self.distance[j][1]
+        return TARGET_POS, TARGET_RPY , TARGET_VEL,TARGET_OMEGA
+        
     ################################################################################
 
     def _decisionSystem(self): #Aggiungere gli input necessari
         """Definisce la logica di scelta della direzione da prendere dopo uno stop (dopo che becca muro)
-        
+           #TODO: Definire funzione Controlla sWF e observation[i][0:3] e, capendo dov è il muro sceglie una nuova direzione
         """
+        sWF = np.array([[self.S_WF] for j in range(self.NUM_DRONES)])
         
-        #TODO: Definire funzione
-
         pass
     
     ################################################################################
 
-    def _WallFollowing(self):     #ALG B.1
-        """Funzione per seguire in modo allineato il muro -> tira fuori la rotazione desiderata da mandare ai controlli
-        # TODO check gli help
-        
-        Parameters
-        ---------
-        WFstate prende tre possibili valori:
-        - WFstate = 0 ruotare per allinearsi al muro
-        - WFstate = 1 ruotare e seguire il muro
-        - WFstate = 2 ruotare attorno all'angolo
-       
-        Returns
-        --------
-        omega: tipo
-            descrizione
-        vel: tipo
-            descrizione
-        WFstate: int
-            aggiorna il WFstate
-        """
-        td = 0.02           ## threshold distance to determine wether the drone is almost at reference distance from wall
-        sWF = self.S_WF     ## mi sa che tocca sia un vettore con un valore per ogni drone
-        hit_distance,Hit_point,self.Min_dist= self._MinDistToWall(self)
-        cw = self.C_OMEGA   ## mi sa che tocca sia un vettore con un valore per ogni drone
-        cv = self.C_VEL     ## mi sa che tocca sia un vettore con un valore per ogni drone
-        self.beta = np.deg2rad(90 - self.alfa/2) #angolo tra rf e rs 
-        omega = []
-        vel = []
-        self.rf = [] ## front distance to hit (observation)
-        self.rs = [] ##
-        for i in range(self.NUM_DRONES) :
-            for j in range(self.NUM_SENSORS) :
-                if hit_distance[i][1]!= self.max_range : 
-                    self.rf.append(hit_distance[j][1]) # due range finders laterai
-                    self.rs.append(hit_distance[j][21])
-                elif hit_distance[j][20]!=self.max_range :
-                    self.rf.append(hit_distance [j][20])  #raggi esterni stereocamera/sensore di profondità 
-                    self.rs.append(hit_distance[j][21])
-                else :
-                    self.rf.append([self.max_range])
-                    self.rs.append([self.max_range])
-                dR = self.Min_dist #minima distanza dal muro calcolata con RANSAC
-                if WFstate == 0 :#ruoto per allinearmi al muro
-                    omega.append([-1*sWF[j]*cw])
-                    vel.append([0])
-                    if np.abs(self.rs - self.rf * np.cos(self.beta)) < td :
-                        WFstate = 1 # mi sono ruotato e ora voglio seguire il muro
-                    if self.rf == self.max_range :
-                        WFstate = 2 #mi giro ma non vedo più il muro quindi ci sta un angolo
-                elif WFstate == 1 :#ruotare e seguire il muro
-                    vel.append([cv])
-                    Omega = self._WallFollowingandAllign(self)
-                    omega.append(Omega)
-                    if dR < self.DIST_WALL_REF :
-                        WFstate = 0 #sono vicino al muro devo girare per allinearmi
-                    if self.rf == self.max_range :
-                        WFstate = 2 #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo
-                elif WFstate == 2 :
-                    vel.append([cv])
-                    omega.append([sWF[j]*cv/self.DIST_WALL_REF])
-                if np.abs(self.rs - self.rf* np.cos(self.beta)) < 0.01 :
-                        WFstate = 1 # ho agirato l'angolo e conttinuo a seguire il muro
-                if dR < self.DIST_WALL_REF:
-                        WFstate = 0 #sto girando vedo il muro ma non sono allineato, mi devo girare    
-        
-        return omega , vel , WFstate
-    
-    def _WallFollowing2(self):    #ALG B.1
+    def _WallFollowing(self):    #ALG B.1
         """Funzione per seguire in modo allineato il muro -> tira fuori la rotazione desiderata da mandare ai controlli
         # TODO check gli help
         
@@ -213,28 +159,29 @@ class MapAviary(ProjAviary):
         """
         td = 0.02           ## threshold distance to determine wether the drone is almost at reference distance from wall
         sWF = self.S_WF     ## implementato come (NUM_DRONES, 1)-shaped array che indica muro a destra o sinistra
-        self.observation , self.distance = self._MinDistToWall()
+        self.distance = self._MinDistToWall()
         cw = self.C_OMEGA   
         cv = self.C_VEL     
-        omega = np.array([[] for j in range(self.NUM_DRONES)])
-        vel = np.array([[] for j in range(self.NUM_DRONES)])
+        omega = np.array([[0.] for j in range(self.NUM_DRONES)])
+        vel = np.array([[0.] for j in range(self.NUM_DRONES)])
         
         for i in range(self.NUM_DRONES) :
             if self.WFSTATE[i] == 0 : #ruoto per allinearmi al muro
-                omega [i] = ([-1*sWF[i]*cw])
+                omega [i] = ([-1*sWF[i][0]*cw])
                 vel [i] = ([0])
                 if np.abs(self.distance[i][0] - self.distance[i][1]) < td : 
                     self.WFSTATE[i]= 1 # mi sono ruotato e ora voglio seguire il muro
                 if sWF == 1: # wallfollowing con muro a destra
-                    if self.observation[i][3] == self.max_range: 
+                    if self.observation[i][3] == self.MAX_RANGE: 
                         self.WFSTATE[i] = 2 #mi giro ma non vedo più il muro quindi ci sta un angolo
                 elif sWF == -1: # wallfollowing con muro a sinistra
-                    if self.observation[i][1] == self.max_range:
+                    if self.observation[i][1] == self.MAX_RANGE:
                         self.WFSTATE[i] = 2 #mi giro ma non vedo più il muro quindi ci sta un angolo
             elif self.WFSTATE[i] == 1 :#ruotare e seguire il muro    FINE TUNING
                 vel [i] = ([cv]) 
-                Omega = self._WallFollowingandAlign2(self, i)  
-                omega[i]= ([Omega])
+                Omega = self._WallFollowingandAlign(i)  
+                print(Omega)
+                omega[i]= ([Omega[0]])
                 if self.distance[i][1] < self.DIST_WALL_REF :
                     self.WFSTATE[i] = 0 #sono vicino al muro devo girare per allinearmi
                 if self.distance[i][1] == np.inf and self.distance[i][0] != np.inf :   
@@ -242,7 +189,7 @@ class MapAviary(ProjAviary):
                                                                                     # nel nostro caso già superato, iniziamo una curba morbida
             elif self.WFSTATE[i] == 2 :  # TODO il girare l'angolo potrebbe fallire miseramente
                 vel [i] = ([cv])
-                omega[i] = ([sWF[i]*cv/self.DIST_WALL_REF])
+                omega[i] = ([sWF[i][0]*cv/self.DIST_WALL_REF])
             if np.abs(self.distance[i][1] - self.DIST_WALL_REF) < td :  # se la distanza e la distanza di riferimento sono vicine dovrei aver finito la rotaz
                     self.WFSTATE[i] = 1 # ho agirato l'angolo e conttinuo a seguire il muro
             if self.distance[i][1] < self.DIST_WALL_REF:
@@ -250,26 +197,7 @@ class MapAviary(ProjAviary):
         
         return omega , vel , self.WFSTATE
     ################################################################################
-
-    def _WallFollowingandAlign(self):     #ALG B.2
-        td = 0.02
-        omega=[]
-        for j in range(self.NUM_DRONES):
-            if np.abs(self.distWallRef-self.Min_dist[j]) > td :#sono lontano da td
-                if self.distWallRef-self.Min_dist[j] > td :
-                    omega.append([self.sWF*self.comega]) # molto lontano dal muro
-                else : 
-                    omega.append([-self.sWF*self.comega]) #troppo vicino al muro
-            elif np.abs(self.distWallRef-self.Min_dist[j]) < td :#sono vicino al td
-                if self.rs[j] > self.rf[j]*np.cos(self.beta):
-                      omega.append([self.sWF*self.comega])
-                else : 
-                     omega.append([-self.sWF*self.comega])
-            else :
-                 omega.append([0])
-        return omega
-    
-    def _WallFollowingandAlign2(self , nth_drone):    #ALG B.2  versione con solo il sensore davanti, credo necessiti di un meccanismo di memoria
+    def _WallFollowingandAlign(self , nth_drone):    #ALG B.2  versione con solo il sensore davanti, credo necessiti di un meccanismo di memoria
         """funzione per seguire il muro -> mi da la omega mentre sto navigando vicino al muro per evitare di allontanarmi dal muro
         Returns
         --------
@@ -318,15 +246,15 @@ class MapAviary(ProjAviary):
         ----------
             (NUM_DRONES, 1)-shaped array, copia di distance che vorrei fosse salvata a livello di script topo.py e che entra nel seguente run di NextWP
         """
-        observation, Hit_point = self._sensorsObs()
+        # observation, Hit_point = self._sensorsObs()
         sWF = self.S_WF
         distance=np.array([[np.inf , np.inf] for j in range(self.NUM_DRONES)] )   
         for i in range(self.NUM_DRONES):
-            distance[i]=[]
-            rF = observation[i][0] # distanza frontale
-            rL = observation[i][1] # distanza sinistra
-            rB = observation[i][2] # distanza retro
-            rR = observation[i][3] # distanza destra
+            #distance[i]=[]
+            rF = self.observation[i][0] # distanza frontale
+            rL = self.observation[i][1] # distanza sinistra
+            rB = self.observation[i][2] # distanza retro
+            rR = self.observation[i][3] # distanza destra
             if sWF == 1: # se wall following con muro sulla mia destra , devo trovare le distanze N-E e S-E
                 NEalfa = np.arctan(rF/rR) # complementare dell'angolo di "raddrizzamento" rispetto al muro
                 SEalfa = np.arctan(rB/rR) # stessa ma dietro
@@ -346,29 +274,7 @@ class MapAviary(ProjAviary):
                 elif sWF == -1:
                     distance[i][1] = rL   # ... prendo l'observation laterale (anche se non è perpendicolare)
         #distance = distance
-        return observation , distance
+        return distance
 
-# ricorda che devi runnare
+         # ricorda che devi runnare
             #     distance[:][0] =  distance[:][1]
-
-        '''
-        for i in range(self.NUM_DRONES):
-            for j in range(observation[i][j]):
-                if observation[i][j] < self.max_range:
-                   hit_point = Hit_point[i][j]
-            if hit_point == []:
-                distance.append ([])
-            else : 
-                idx = np.random.choice(len(hit_point), 2, replace=False)
-                x1, y1 = hit_point[idx[0]][0:1]
-                x2, y2 = hit_point[idx[1]][0:1]
-
-                # Calcola l'equazione della retta usando i due punti
-                slope = (y2 - y1) / (x2 - x1)
-                intercept = y1 - slope * x1
-
-                # Valuta la distanza da ogni punto alla retta
-                distance.append([np.abs(slope * x1 - y1 + intercept) / np.sqrt(slope**2 + 1)])
-        
-        return observation, Hit_point , distance
-        '''
