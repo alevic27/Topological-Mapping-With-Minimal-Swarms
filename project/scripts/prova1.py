@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 from gym_pybullet_drones.utils.enums import DroneModel, Physics
 # importa una una classe che descrive il controllo del drone
-from project.envs.NavAviary import NavAviary
+from project.envs.MapAviary import MapAviary
 # importa il file .py con la definizione di tutte le function necessarie al controllo PID 
 #(ci v messo per forza un drone CF2X o CF"P perchè presenta parametri
 #di controllo solo per questi due tipi)
@@ -78,16 +78,10 @@ def run(
     Y_STEP_ini = .05 # in caso di multi agenti li faccio partire in posizioni diverse (possibilmente davanti all'ingresso)
     #posizione e velocità iniziale per ogni drone 
     INIT_XYZS = np.array([[X_ini,Y_ini+i*Y_STEP_ini, H_ini] for i in range(num_drones)])
-    INIT_RPYS = np.array([[0, 0, 0] for i in range(num_drones)])
+    INIT_RPYS = np.array([[0., 0., 0.] for i in range(num_drones)])
 
     #### WP target ######################
     #inserisco per ota un unico WP da raggiungere
-    X_target = 0
-    Y_target = 2
-    H_target = H_ini
-    STEP = 0.05
-    NUM_WP = 1
-    n_colonne = 3
     TARGET_POS = INIT_XYZS
     TARGET_RPY =  INIT_RPYS
    
@@ -97,7 +91,8 @@ def run(
     wp_counters = np.array([0 for i in range(num_drones)])  #comodo quando si fisseranno i primi nodi
     
     #### Create the environment ################################
-    env = NavAviary (  drone_model = drone ,
+    env = MapAviary (  drone_model = drone ,
+                        num_drones = DEFAULT_NUM_DRONES,
                         neighbourhood_radius=10,
                         initial_xyzs=INIT_XYZS,
                         initial_rpys=INIT_RPYS,
@@ -105,9 +100,11 @@ def run(
                         pyb_freq=simulation_freq_hz,
                         ctrl_freq=control_freq_hz,
                         gui=gui,
-                        record=record_video,
-                        obstacles=obstacles,
-                        user_debug_gui=user_debug_gui,
+                        vision = False,
+                        img_res  = np.array([64, 48]),
+                        save_imgs=False,
+                        obstacle_ids=False,
+                        labyrinth_id = "0",
                         sensors_attributes = sensors_attributes,
                         max_sensors_range = max_sensors_range,
                         ref_distance = ref_distance,
@@ -133,26 +130,19 @@ def run(
     for i in range(0, int(duration_sec*env.CTRL_FREQ)):
 
         #### Step the simulation ###################################
-        obs, obs_sensors, reward, terminated, truncated, info = env.step(action)
+        obs, observation, reward, terminated, truncated, info = env.step(action)
 
         #### Compute control for the current way point #############
-        for j in range(num_drones):
-            
-            #### Genero la traiettoria #####################
-            for j in range(num_drones):     
-                    if obs_sensors[0][j][0] > ref_distance:
-                            TARGET_POS[j] = obs[j][0:3]+ np.array([STEP,0 , 0]) 
-                            TARGET_RPY[j] = [0,0,0]                                            
-                    else : 
-                            TARGET_POS[j] = TARGET_POS
-                            TARGET_RPY[j] = np.array([0, 0 , math.pi /2])
-  
-            # applica i controlli in modo da raggiungere un certo punto con un certa velocità
+        TARGET_POS , TARGET_RPY ,TARGET_VEL , TARGET_OMEGA = env.NextWP(obs,observation)
+           
+        # applica i controlli in modo da raggiungere un certo punto con un certa velocità
+        for j in range(num_drones) :
             action[j, :], _, _ = ctrl[j].computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
                                                                     state=obs[j],
                                                                     target_pos=TARGET_POS[j],
                                                                     target_rpy=TARGET_RPY[j],
-                                                                    target_vel = np.zeros((1,3))
+                                                                    target_vel = TARGET_VEL[j],
+                                                                    target_rpy_rates = TARGET_OMEGA[j]
                                                                     )
 
                     
