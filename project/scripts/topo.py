@@ -117,16 +117,18 @@ def run(
         obs, observation, reward, terminated, truncated, info = env.step(action)
 
         #### Compute control for the current way point #############
-        TARGET_POS , TARGET_RPY , TARGET_VEL , TARGET_RPY_RATES = env.NextWP(obs,observation)        
-        # velocity control check (no target_pos input)
-        #TARGET_VEL , TARGET_RPY_RATES = env.NextWP_VEL(obs,observation)
+        TARGET_POS , TARGET_RPY , TARGET_VEL , TARGET_RPY_RATES = env.NextWP(obs,observation)       
+
+        # velocity control PLACEHOLDER #TO BE IMPLEMENTED
+        #TARGET_VEL , TARGET_RPY_RATES = env.NextWP_VEL(obs,observation) #
+        
         # applica i controlli in modo da raggiungere un certo punto con un certa velocità
         for j in range(num_drones) :
             action[j, :], _, _ = ctrl[j].computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
                                                                     state=obs[j],
                                                                     target_pos=TARGET_POS[j],
                                                                     target_rpy=TARGET_RPY[j],
-                                                                    target_vel = TARGET_VEL[j],
+                                                                    #target_vel = TARGET_VEL[j],
                                                                     #target_rpy_rates = TARGET_RPY_RATES[j]
                                                                     )
        

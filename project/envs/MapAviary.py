@@ -28,7 +28,7 @@ class MapAviary(ProjAviary):
                  sensors_attributes = True,
                  max_sensors_range: float = np.inf,
                  ref_distance : float = 0.5,
-                 s_WF: int = -1,
+                 s_WF: int = +1,
                  c_omega : float = 1,
                  c_vel: float = 0.1,
                  output_folder='results',
@@ -96,9 +96,10 @@ class MapAviary(ProjAviary):
         self.C_OMEGA = c_omega  # costante di velocità di correzione rotta. unica per tutti i droni
         self.C_VEL=c_vel        # output sulla velocità di controllo per il raddrizzamento
         self.WFSTATE = np.array([[WFstate] for j in range(self.NUM_DRONES)])
-        self.PREV_DIST = np.array([[] for j in range(self.NUM_DRONES)])
+        # self.PREV_DIST = np.array([[] for j in range(self.NUM_DRONES)]) # obsolete
         self.CTRL_FREQ = ctrl_freq 
         self.MAX_RANGE = max_sensors_range
+        self.distance=np.array([[np.inf , np.inf] for j in range(self.NUM_DRONES)] )
     ################################################################################
 
     def NextWP(self,obs,observation): #Aggiungere gli input necessari
@@ -135,7 +136,7 @@ class MapAviary(ProjAviary):
 
         #print(obs[i][0:3])
         #print(TARGET_POS[0])
-        for j in range(self.NUM_DRONES) :
+        for j in range(self.NUM_DRONES) : # saves actual mindist to distance[0]. It will be the prev_dist of next step
             self.distance[j][0] =  self.distance[j][1]
         return TARGET_POS, TARGET_RPY, TARGET_VEL, TARGET_RPY_RATES
 
@@ -248,7 +249,7 @@ class MapAviary(ProjAviary):
         """
         td = 0.02           ## threshold distance to determine wether the drone is almost at reference distance from wall
         sWF = self.S_WF     ## implementato come (NUM_DRONES, 1)-shaped array che indica muro a destra o sinistra
-        self.distance = self._MinDistToWall()
+        self._MinDistToWall()  ## updates distance [[prev_dist , curr_dist]]
         cw = self.C_OMEGA   
         cv = self.C_VEL     
         omega = np.array([[0.] for j in range(self.NUM_DRONES)])
@@ -256,9 +257,10 @@ class MapAviary(ProjAviary):
         
         for i in range(self.NUM_DRONES) :
             if self.WFSTATE[i] == 0 : #ruoto per allinearmi al muro
-                omega [i] = ([-1*sWF[i][0]*cw])
+                omega [i] = ([-1*sWF[i][0]*cw])   # TODO check sign
                 vel [i] = ([0])
-                if np.abs(self.distance[i][0] - self.distance[i][1]) < td : 
+                if np.abs(self.distance[i][0] - self.distance[i][1]) < td : # se distanza precedente e distanza attuale sono molto vicine 
+                       ### TODO sensibility tuning or different logic
                     self.WFSTATE[i]= 1 # mi sono ruotato e ora voglio seguire il muro
                 if sWF == 1: # wallfollowing con muro a destra
                     if self.observation[i][3] == self.MAX_RANGE: 
@@ -323,21 +325,15 @@ class MapAviary(ProjAviary):
         """Distanza minima dall'ostacolo.
             ATTENZIONE: nelle fasi di volo circa parallelo al muro non ritorna la distanza minima esatta ma l'observation del RF laterale
         TODO richiede sWF per capire da che lato  (e faccio che la aggiorna???)
-        Output
-        ----------
-        observation : ndarray
-            (NUM_DRONES, 4)-shaped array containing the front/right/back/left distance observed
-        distance : ndarray
-            (NUM_DRONES, 2)-shaped array containing the minimal distance observed  , se vale np.inf vuol dire che non vede proprio niente
-        self.PREV_DIST: ndarray
 
         Updates
         ----------
-            (NUM_DRONES, 1)-shaped array, copia di distance che vorrei fosse salvata a livello di script topo.py e che entra nel seguente run di NextWP
+        self.distance : ndarray   [[]]
+            (NUM_DRONES, 2)-shaped array containing the minimal distance observed  , se vale np.inf vuol dire che non vede proprio niente
         """
         # observation, Hit_point = self._sensorsObs()
         sWF = self.S_WF
-        distance=np.array([[np.inf , np.inf] for j in range(self.NUM_DRONES)] )   
+        #distance=np.array([[np.inf , np.inf] for j in range(self.NUM_DRONES)] ) 
         for i in range(self.NUM_DRONES):
             #distance[i]=[]
             rF = self.observation[i][0] # distanza frontale
@@ -349,21 +345,16 @@ class MapAviary(ProjAviary):
                 SEalfa = np.arctan(rB/rR) # stessa ma dietro
                 NEdistance = rF * np.cos(NEalfa)
                 SEdistance = rB * np.cos(SEalfa)
-                distance[i][1] = min(NEdistance, SEdistance) # minimo tra le due distanze
+                self.distance[i][1] = min(NEdistance, SEdistance) # minimo tra le due distanze
                         ### (una in genere è inf a meno che non siamo vicino a uno spigolo e posso sfruttare ciò)
             elif sWF == -1: # se wall following con muro sulla mia sinistra , devo trovare le distanze N-O e S-O
                 NWalfa = np.arctan(rF/rL) #complementare dell'angolo di "raddrizzamento" rispetto al muro
                 SWalfa = np.arctan(rB/rL) #complementare dell'angolo di "raddrizzamento" rispetto al muro
                 NWdistance = rF * np.cos(NWalfa)
                 SWdistance = rB * np.cos(SWalfa)
-                distance[i][1] = min(NWdistance, SWdistance) #distanza perpendicolare che però potrebbe essere vuota per la questione OoR
-            if distance[i][1] == np.inf:  # se sia front che retro è OoR nel lato del wallfollowing...
+                self.distance[i][1] = min(NWdistance, SWdistance) #distanza perpendicolare che però potrebbe essere vuota per la questione OoR
+            if self.distance[i][1] == np.inf:  # se sia front che retro è OoR nel lato del wallfollowing...
                 if sWF == 1:
-                    distance[i][1] = rR   # ... prendo l'observation laterale (anche se non è perpendicolare)
+                    self.distance[i][1] = rR   # ... prendo l'observation laterale (anche se non è perpendicolare)
                 elif sWF == -1:
-                    distance[i][1] = rL   # ... prendo l'observation laterale (anche se non è perpendicolare)
-        #distance = distance
-        return distance
-
-         # ricorda che devi runnare
-            #     distance[:][0] =  distance[:][1]
+                    self.distance[i][1] = rL   # ... prendo l'observation laterale (anche se non è perpendicolare)
