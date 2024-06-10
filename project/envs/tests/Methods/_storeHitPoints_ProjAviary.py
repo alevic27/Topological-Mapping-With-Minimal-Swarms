@@ -29,5 +29,10 @@ Hit_point = np.array([
 env = ProjAviary(num_drones=3, gui=False)
 env._storeHitPoints(Hit_point)
 
-print(env.CLOUD_POINT)
+if np.shape(env.CLOUD_POINT) == (10, 3):
+    print('############### TEST SUCCESFUL ###############')
+else:
+    print('############### TEST UNSUCCESFUL ###############')
+    print('Expected 2 dimensional 10 by 3 array for env.CLOUD_POINT')
+    print('Current shape of env.CLOUD_POINT: ', np.shape(env.CLOUD_POINT))
 
