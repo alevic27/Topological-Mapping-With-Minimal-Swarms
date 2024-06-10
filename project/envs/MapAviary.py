@@ -29,7 +29,7 @@ class MapAviary(ProjAviary):
                  max_sensors_range: float = np.inf,
                  ref_distance : float = 0.5,
                  s_WF: int = -1,
-                 c_omega : float = 0.,
+                 c_omega : float = 1,
                  c_vel: float = 0.1,
                  output_folder='results',
                  WFstate : int = 0,
@@ -110,22 +110,111 @@ class MapAviary(ProjAviary):
         TARGET_POS = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
         TARGET_RPY = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
         time_step  = 1 / self.CTRL_FREQ
+
+        TARGET_VEL = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
+        TARGET_RPY_RATES = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
         #self.S_WF=self._decisionSystem()  # controllare se aggiornare in self o no
-        TARGET_OMEGA, TARGET_VEL , self.WFSTATE = self._WallFollowing()
+        TARGET_OMEGA, TARGET_FW_VEL , self.WFSTATE = self._WallFollowing()
         for i in range(self.NUM_DRONES) :
-            TARGET_POS[i][0]   = obs[i][0]    + TARGET_VEL[i] * time_step  # solo i primi due
+            TARGET_POS[i][0]   = obs[i][0]    + TARGET_FW_VEL[i] * time_step  # solo i primi due
             TARGET_POS[i][1:3] = obs[i][1:3]
             #print(obs[i][0:3])
-            #print(TARGET_POS[i][0:3])
+            print(TARGET_POS[i][0:3])
+            print(TARGET_VEL[i][0:3])
             TARGET_RPY[i][0:2] = obs[i][7:9]   
             TARGET_RPY[i][2]   = obs[i][9]   + TARGET_OMEGA[i] * time_step # solo il terzo elemento
+            print(TARGET_RPY[i][0:3])
+            print(TARGET_OMEGA[i][0:3])
+
+            TARGET_VEL[i][0] = TARGET_FW_VEL[i]
+            TARGET_VEL[i][1] = obs[i][10]
+            TARGET_VEL[i][2] = 0.
+            TARGET_RPY_RATES[i][0] = 0.
+            TARGET_RPY_RATES[i][1] = 0.
+            TARGET_RPY_RATES[i][2] = TARGET_OMEGA[i]
+
         #print(obs[i][0:3])
         #print(TARGET_POS[0])
         for j in range(self.NUM_DRONES) :
             self.distance[j][0] =  self.distance[j][1]
-        return TARGET_POS, TARGET_RPY , TARGET_VEL,TARGET_OMEGA
+        return TARGET_POS, TARGET_RPY, TARGET_VEL, TARGET_RPY_RATES
+
+    def NextWP2(self,obs,observation): #Aggiungere gli input necessari
+        """Definisce la logica di navigazione trovando il prossimo WP usando le funzioni:
+        - _DecisionSystem
+        - _WallFollowing()  , il quale chiama _WallFollowingAndAlign()
+        """
+        self.observation = observation
+        TARGET_POS = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
+        TARGET_RPY = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
+        TARGET_VEL = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
+        TARGET_RPY_RATES = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
+
+        time_step  = 1 / self.CTRL_FREQ
+        #self.S_WF=self._decisionSystem()  # controllare se aggiornare in self o no
+        TARGET_OMEGA, TARGET_FW_VEL , self.WFSTATE = self._WallFollowing()
+        for i in range(self.NUM_DRONES) :
+            # #TARGET_FW_VEL[i] = 0. 
+            # TARGET_POS[i][0] = obs[i][0] + TARGET_FW_VEL[i] * time_step  # X
+            # TARGET_POS[i][1] = obs[i][1] # + TARGET_FW_VEL[i] * time_step 
+            # TARGET_POS[i][2] = 1.       # TODO mettere INIT_XYZS tra gli input
+            # TARGET_VEL[i][0] = TARGET_FW_VEL[i]                 # obs[i][10]
+            # TARGET_VEL[i][1] = TARGET_FW_VEL[i]                 # obs[i][11]
+            # TARGET_VEL[i][2] = 0.                  # obs[i][12]             
+            # #print(obs[i][0:3])
+            # #print(TARGET_POS[i][0:3])
+            # #TARGET_OMEGA[i] = 1
+            # TARGET_RPY[i][0] = obs[i][7]
+            # TARGET_RPY[i][1] = obs[i][8]   
+            # TARGET_RPY[i][2] = obs[i][9] + TARGET_OMEGA[i] * time_step # solo il terzo elemento
+            # #TARGET_RPY_RATES[i][0] = obs[i][13]
+            # #TARGET_RPY_RATES[i][1] = obs[i][14]
+            # #TARGET_RPY_RATES[i][2] = obs[i][15]
+
+            TARGET_POS[i][0]   = obs[i][0]    + TARGET_FW_VEL[i] * time_step  # solo i primi due
+            TARGET_POS[i][1:3] = obs[i][1:3]
+            #print(obs[i][0:3])
+            print(TARGET_POS[i][0:3])
+            TARGET_RPY[i][0:2] = obs[i][7:9]   
+            TARGET_RPY[i][2]   = obs[i][9]   + TARGET_OMEGA[i] * time_step # solo il terzo elemento
+            print(TARGET_RPY[i][0:3])
+        #print(obs[i][0:3])
+        #print(TARGET_POS[0])
+        for j in range(self.NUM_DRONES) : # mette in memoria la nuova distanza al primo posto
+            self.distance[j][0] =  self.distance[j][1]
+        return TARGET_POS, TARGET_RPY , TARGET_VEL, TARGET_RPY_RATES
         
     ################################################################################
+
+    def NextWP_VEL(self,obs,observation): #Aggiungere gli input necessari
+        """Definisce la logica di navigazione trovando il prossimo WP usando le funzioni:
+        - _DecisionSystem
+        - _WallFollowing()  , il quale chiama _WallFollowingAndAlign()
+        """
+        self.observation = observation
+        TARGET_VEL = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
+        TARGET_RPY_RATES = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
+        time_step  = 1 / self.CTRL_FREQ
+        #self.S_WF=self._decisionSystem()  # controllare se aggiornare in self o no
+        omega, vel , self.WFSTATE = self._WallFollowing()  # yaw_rate e forward_vel
+        for i in range(self.NUM_DRONES) :
+            # cur_vel = obs[i][10:13]
+            # cur_ang_vel = obs[i][13:16]
+            TARGET_VEL[i][0] = vel[i][0]  # TODO: mi sa che è una velocità lungo x assoluta
+            TARGET_VEL[i][1] = obs[i][11]
+            TARGET_VEL[i][2] = obs[i][12]
+            #print(obs[i][0:3])
+            #print(TARGET_POS[i][0:3])
+            TARGET_RPY_RATES[i][0] = obs[i][13]   
+            TARGET_RPY_RATES[i][1] = obs[i][14] 
+            TARGET_RPY_RATES[i][2] = omega[i][0] # solo il terzo elemento
+        #print(obs[i][0:3])
+        #print(TARGET_POS[0])
+        for j in range(self.NUM_DRONES) :
+            self.distance[j][0] =  self.distance[j][1]
+        return TARGET_VEL, TARGET_RPY_RATES
+        
+    ################################################################################    
 
     def _decisionSystem(self): #Aggiungere gli input necessari
         """Definisce la logica di scelta della direzione da prendere dopo uno stop (dopo che becca muro)
@@ -150,12 +239,12 @@ class MapAviary(ProjAviary):
        
         Returns
         --------
-        omega: tipo
-            descrizione
-        vel: tipo
-            descrizione
-        WFstate: int
-            aggiorna il WFstate
+        omega: ndarray - [[float] for j in range(self.NUM_DRONES)]
+            (NUM_DRONES, 1)-shaped array che contiene la omega (yaw_rate) di controllo per ogni drone
+        vel: ndarray - [[float] for j in range(self.NUM_DRONES) ]
+            (NUM_DRONES, 1)-shaped array che contiene la velocita di avanzamento frontale di controllo per ogni drone
+        WFstate: ndarray - [[int] for j in range(self.NUM_DRONES) ]
+            (NUM_DRONES, 1)-shaped array che indica lo stato nella logica di wallfollowing per ogni drone
         """
         td = 0.02           ## threshold distance to determine wether the drone is almost at reference distance from wall
         sWF = self.S_WF     ## implementato come (NUM_DRONES, 1)-shaped array che indica muro a destra o sinistra
@@ -181,7 +270,7 @@ class MapAviary(ProjAviary):
                 vel [i] = ([cv]) 
                 Omega = self._WallFollowingandAlign(i)  
                 print(Omega)
-                omega[i]= ([Omega[0]])
+                omega[i]= Omega
                 if self.distance[i][1] < self.DIST_WALL_REF :
                     self.WFSTATE[i] = 0 #sono vicino al muro devo girare per allinearmi
                 if self.distance[i][1] == np.inf and self.distance[i][0] != np.inf :   
@@ -213,20 +302,20 @@ class MapAviary(ProjAviary):
         if np.abs(self.DIST_WALL_REF-self.distance[nth_drone][1]) > td : # sono fuori dalla regione accettabile ( o troppo lontano (distance > dist_wall_ref))
                                                                                                             #  o troppo vicino  (distance < dist_wall_ref)
             if self.distance[nth_drone][0] > self.DIST_WALL_REF:     # troppo lontano dal muro
-                omega = ([self.S_WF*self.C_OMEGA])        # TODO check sign
+                omega = ([self.S_WF[nth_drone][0]*self.C_OMEGA])        # TODO check sign
             else :                                                # troppo vicino al muro
-                omega = ([-self.S_WF*self.C_OMEGA])       
+                omega = ([-self.S_WF[nth_drone][0]*self.C_OMEGA])       
         elif np.abs(self.DIST_WALL_REF-self.distance[nth_drone][1]) < td : #sono dentro alla regione accettabile
             # meccanismo di fine tune alignment basato su confronto con distance[iesimo drone][0]
             if self.distance[nth_drone][0] > self.distance[nth_drone][1]:
                 #omega = ([self.S_WF*self.C_OMEGA])     # TODO andiamo a culo vedi se cambiare
-                omega = ([0])
+                omega = ([0.])
             else : 
                 #omega = ([-self.S_WF*self.C_OMEGA])
-                omega = ([0])
+                omega = ([0.])
         else :
-            omega = ([0])
-        return omega    
+            omega = ([0.])
+        return omega      #TODO : omega in tutti i casi deve essere
     
     ################################################################################
 
