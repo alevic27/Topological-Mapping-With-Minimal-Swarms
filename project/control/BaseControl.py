@@ -55,7 +55,7 @@ class BaseControl(object):
     def computeControlFromState(self,
                                 control_timestep,
                                 state,
-                                target_pos,
+                                target_pos=np.zeros(3),   # inizializzato ora a 0
                                 target_rpy=np.zeros(3),
                                 target_vel=np.zeros(3),
                                 target_rpy_rates=np.zeros(3)

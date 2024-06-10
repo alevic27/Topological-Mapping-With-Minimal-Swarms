@@ -3,7 +3,7 @@ import numpy as np
 import pybullet as p
 from scipy.spatial.transform import Rotation
 
-from gym_pybullet_drones.control.BaseControl import BaseControl
+from project.control.BaseControl import BaseControl
 from gym_pybullet_drones.utils.enums import DroneModel
 
 class Vel_AngVel_PIDControl(BaseControl):
@@ -36,6 +36,9 @@ class Vel_AngVel_PIDControl(BaseControl):
         self.P_COEFF_VEL = np.array([.4, .4, 1.25])
         self.I_COEFF_VEL = np.array([.05, .05, .05])
         self.D_COEFF_VEL = np.array([.2, .2, .5])
+        self.P_COEFF_TOR = np.array([70000., 70000., 60000.])
+        self.I_COEFF_TOR = np.array([.0, .0, 500.])
+        self.D_COEFF_TOR = np.array([20000., 20000., 12000.])
         self.P_COEFF_ANGVEL = np.array([70000., 70000., 60000.])
         self.I_COEFF_ANGVEL = np.array([.0, .0, 500.])
         self.D_COEFF_ANGVEL = np.array([20000., 20000., 12000.])
@@ -72,9 +75,17 @@ class Vel_AngVel_PIDControl(BaseControl):
 
         """
         super().reset()
+        
+        #### Store the last roll, pitch, and yaw ###################
+        self.last_rpy = np.zeros(3)
         #### Store the last roll_rate, pitch_rate, and yaw_rate ###################
         self.last_rpy_rates = np.zeros(3)
         #### Initialized PID control variables #####################
+        self.last_pos_e = np.zeros(3)
+        self.integral_pos_e = np.zeros(3)
+        self.last_rpy_e = np.zeros(3)
+        self.integral_rpy_e = np.zeros(3)
+
         self.last_vel_e = np.zeros(3)
         self.integral_vel_e = np.zeros(3)
         self.last_rpy_rates_e = np.zeros(3)
@@ -131,10 +142,8 @@ class Vel_AngVel_PIDControl(BaseControl):
         """
         self.control_counter += 1
         thrust, computed_target_rpy, pos_e = self._dslPIDVelocityControl(control_timestep,
-                                                                         cur_pos,
                                                                          cur_quat,
-                                                                         cur_vel,
-                                                                         target_pos,
+                                                                         cur_vel,                                                                         
                                                                          target_rpy,
                                                                          target_vel
                                                                          )
