@@ -385,8 +385,9 @@ class MapAviary(ProjAviary):
                 omega[i] = ([-self.S_WF[i][0]*cv/self.DIST_WALL_REF])
                 print("la differenza tra distance e DISTWALLREF",  np.abs(self.distance[i][1] - self.DIST_WALL_REF) )
                 if np.abs(self.distance[i][1] - self.DIST_WALL_REF) < self.td :  # se la distanza e la distanza di riferimento sono vicine dovrei aver finito la rotaz
-                    self.WFSTATE[i] = 1 # ho agirato l'angolo e conttinuo a seguire il muro
-                    print("esco da WFSTATE = 2 e entro in WFSTATE = 1")
+                    #self.WFSTATE[i] = 1 # ho agirato l'angolo e conttinuo a seguire il muro
+                    self.WFSTATE[i] = 0 # ho agirato l'angolo e conttinuo a seguire il muro
+                    print("esco da WFSTATE = 2 e entro in WFSTATE = 0")
                 if self.distance[i][1] < self.DIST_WALL_REF:
                     self.WFSTATE[i] = 0 #sto girando vedo il muro ma non sono allineato, mi devo girare  
                     print("esco da WFSTATE = 2 e entro in WFSTATE = 0") 
@@ -417,7 +418,7 @@ class MapAviary(ProjAviary):
         if np.abs(self.DIST_WALL_REF-self.distance[nth_drone][1]) > self.td : # sono fuori dalla regione accettabile ( o troppo lontano (distance > dist_wall_ref)) o troppo vicino  (distance < dist_wall_ref)
             if self.distance[nth_drone][1] > self.DIST_WALL_REF:     # troppo lontano dal muro
                 omega = ([-self.S_WF[nth_drone][0]*self.C_OMEGA])        # TODO check sign : CHECKED -
-                print("sono fuori dalla regione e troppo vicino al muro")
+                print("sono fuori dalla regione e troppo lontano al muro")
             else :                                                # troppo vicino al muro
                 omega = ([+self.S_WF[nth_drone][0]*self.C_OMEGA])  # +
                 print("sono fuori dalla regione e troppo vicino al muro")       
