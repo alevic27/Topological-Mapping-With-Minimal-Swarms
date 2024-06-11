@@ -337,15 +337,15 @@ class MapAviary(ProjAviary):
             if self.WFSTATE[i] == 3 : # stato di avanzamento lineare finchè la min dist non si avvicina alla DIST_WALL_REF
                 omega [i] = ([0])
                 vel [i] = ([cv]) 
-                if self.distance[i][1] - self.DIST_WALL_REF < self.td:
+                if self.distance[i][1] - self.DIST_WALL_REF < self.td: # fine stato 3 con decisione unica del S_WF è un _decisionSystem(self)
                     self.WFSTATE[i] = 0
+                    print("esco da WFSTATE = 3 e entro in WFSTATE = 0")
                     if self.distance[i][1] in [rL, NWdistance, SWdistance]:
                         self.S_WF[i] = -1
                     elif self.distance[i][1] in [rR, NEdistance, SEdistance]:
                         self.S_WF[i] = 1
                     else:
                         self.S_WF[i] = 1  # preferenza antioraria            
-#prosegui
             if self.WFSTATE[i] == 0 : #ruoto per allinearmi al muro
                 omega [i] = ([+1*self.S_WF[i][0]*cw])   # TODO check sign
                 vel [i] = ([0])
@@ -354,38 +354,43 @@ class MapAviary(ProjAviary):
                 ##    self.WFSTATE[i]= 1 # mi sono ruotato e ora voglio seguire il muro
                 if self.S_WF == 1: # wallfollowing con muro a destra
                     if np.abs(rR - self.DIST_WALL_REF) < self.td :
-                        self.WFSTATE[i]= 1
+                        self.WFSTATE[i] = 1
+                        print("esco da WFSTATE = 0 e entro in WFSTATE = 1")
                 elif self.S_WF == -1: # wallfollowing con muro a sinistra
                     if np.abs(rL - self.DIST_WALL_REF) < self.td :
-                        self.WFSTATE[i]= 1
-
-                #if sWF == 1: # wallfollowing con muro a destra
-                #    if self.observation[i][3] == self.MAX_RANGE: 
-                #        self.WFSTATE[i] = 2 #mi giro ma non vedo più il muro quindi ci sta un angolo
-                #elif sWF == -1: # wallfollowing con muro a sinistra
-                #    if self.observation[i][1] == self.MAX_RANGE:
-                #        self.WFSTATE[i] = 2 #mi giro ma non vedo più il muro quindi ci sta un angolo
+                        self.WFSTATE[i] = 1
+                        print("esco da WFSTATE = 0 e entro in WFSTATE = 1")
+                #if np.abs(self.distance[i][1] - self.DIST_WALL_REF) < self.td :  # se la distanza e la distanza di riferimento sono vicine dovrei aver finito la rotaz
+                #    self.WFSTATE[i] = 1 # ho agirato l'angolo e conttinuo a seguire il muro
+                ### uscire da WFSTATE = 0 è difficile se 
             elif self.WFSTATE[i] == 1 :#ruotare e seguire il muro    FINE TUNING
                 vel [i] = ([cv]) 
                 Omega = self._WallFollowingandAlign(i)  
                 print("omega=",Omega)
-                print("la differenza è", np.abs(self.distance[i][1] - self.distance[i][0]))
+                print("la differenza tra DISTANCE ORA E PRIMA", np.abs(self.distance[i][1] - self.distance[i][0]))
                 omega[i]= Omega
-                if self.distance[i][1] < self.DIST_WALL_REF/2 :  # un po insensato è gia dentro _WallFollowingandAlign
+                if self.distance[i][1] < self.DIST_WALL_REF/2 :  # sono troppissimo vicino al muro
                     self.WFSTATE[i] = 0 #sono vicino al muro devo girare per allinearmi
+                    print("esco da WFSTATE = 1 e entro in WFSTATE = 0")
                 if self.S_WF == 1: # wallfollowing con muro a destra
                     if rR > self.DIST_WALL_REF + 5*self.td:  # in teoria maggiore di DISTWALLREF + td se vogliamo esse precisi
                         self.WFSTATE[i] = 2 #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
+                        print("esco da WFSTATE = 1 e entro in WFSTATE = 2")
                 elif self.S_WF == -1: # wallfollowing con muro a sinistra
                     if rL > self.DIST_WALL_REF + 5*self.td:
                         self.WFSTATE[i] = 2
+                        print("esco da WFSTATE = 1 e entro in WFSTATE = 2")
             elif self.WFSTATE[i] == 2 :  # TODO il girare l'angolo potrebbe fallire miseramente
                 vel [i] = ([cv])
                 omega[i] = ([-self.S_WF[i][0]*cv/self.DIST_WALL_REF])
+                print("la differenza tra distance e DISTWALLREF",  np.abs(self.distance[i][1] - self.DIST_WALL_REF) )
                 if np.abs(self.distance[i][1] - self.DIST_WALL_REF) < self.td :  # se la distanza e la distanza di riferimento sono vicine dovrei aver finito la rotaz
                     self.WFSTATE[i] = 1 # ho agirato l'angolo e conttinuo a seguire il muro
+                    print("esco da WFSTATE = 2 e entro in WFSTATE = 1")
                 if self.distance[i][1] < self.DIST_WALL_REF:
-                    self.WFSTATE[i] = 0 #sto girando vedo il muro ma non sono allineato, mi devo girare    
+                    self.WFSTATE[i] = 0 #sto girando vedo il muro ma non sono allineato, mi devo girare  
+                    print("esco da WFSTATE = 2 e entro in WFSTATE = 0") 
+            print("nun mollà drone") 
             #self.WFSTATE[i] = 0
             #omega[i] = ([0.5])
             #vel [i] = ([0.2])
@@ -409,13 +414,13 @@ class MapAviary(ProjAviary):
             aggiorna il WFstate
         """
         # vedi se testare C_OMEGA2 per la regione dentro
-        if np.abs(self.DIST_WALL_REF-self.distance[nth_drone][1]) > self.td : # sono fuori dalla regione accettabile ( o troppo lontano (distance > dist_wall_ref))
-                                                                                                            #  o troppo vicino  (distance < dist_wall_ref)
+        if np.abs(self.DIST_WALL_REF-self.distance[nth_drone][1]) > self.td : # sono fuori dalla regione accettabile ( o troppo lontano (distance > dist_wall_ref)) o troppo vicino  (distance < dist_wall_ref)
             if self.distance[nth_drone][1] > self.DIST_WALL_REF:     # troppo lontano dal muro
                 omega = ([-self.S_WF[nth_drone][0]*self.C_OMEGA])        # TODO check sign : CHECKED -
+                print("sono fuori dalla regione e troppo vicino al muro")
             else :                                                # troppo vicino al muro
                 omega = ([+self.S_WF[nth_drone][0]*self.C_OMEGA])  # +
-            print("sono fuori dalla regione")       
+                print("sono fuori dalla regione e troppo vicino al muro")       
         elif np.abs(self.DIST_WALL_REF-self.distance[nth_drone][1]) < self.td : #sono dentro alla regione accettabile
             # meccanismo di fine tune alignment basato su confronto con distance[iesimo drone][0]
             if self.distance[nth_drone][0] > self.distance[nth_drone][1]: # se la distanza dal muro prima era maggiore (mi sto avvicinando)
