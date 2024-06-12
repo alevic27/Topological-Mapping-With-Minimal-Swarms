@@ -34,13 +34,13 @@ DEFAULT_IMG_RES = np.array([64, 48])
 
 DEFAULT_SENSORS_ATTRIBUTES = True
 DEFAULT_SENSORS_RANGE = 4.
-DEFAULT_REF_DISTANCE = 0.5
+DEFAULT_REF_DISTANCE = 0.3
 DEFAULT_LABYRINTH_ID = "2t"  # "0" per i 4 oggettini di BaseRLAviary, "lettera" della versione del labirinto 
 DEFAULT_S_WF: int = +1   #wallfollowing side
 DEFAULT_CONTROL_OMEGA : float = 0.5
 DEFAULT_CONTROL_VELOCITY: float = 0.2
-DEFAULT_WFSTATE : int = 3
-DEFAULT_THRESHOLD_DISTANCE : float = 0.02
+DEFAULT_WFSTATE : int = -1
+DEFAULT_THRESHOLD_DISTANCE : float = 0.04
 
 def run(
         drone=DEFAULT_DRONES,
