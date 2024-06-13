@@ -8,7 +8,7 @@ import csv
 
 from gym_pybullet_drones.utils.Logger import Logger
 from project.envs.MapAviary import MapAviary
-from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
+from project.control.Vel_AngVel_PIDControl import Vel_AngVel_PIDControl
 from gym_pybullet_drones.utils.utils import sync, str2bool
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType
 
@@ -28,19 +28,14 @@ DEFAULT_GUI = True
 DEFAULT_PLOT = True
 DEFAULT_SIMULATION_FREQ_HZ = 240
 DEFAULT_CONTROL_FREQ_HZ = 48
-DEFAULT_DURATION_SEC = 240
+DEFAULT_DURATION_SEC = 60
 
 DEFAULT_IMG_RES = np.array([64, 48])
 
 DEFAULT_SENSORS_ATTRIBUTES = True
 DEFAULT_SENSORS_RANGE = 4.
-DEFAULT_REF_DISTANCE = 0.3
+DEFAULT_REF_DISTANCE = 0.5
 DEFAULT_LABYRINTH_ID = "2t"  # "0" per i 4 oggettini di BaseRLAviary, "lettera" della versione del labirinto 
-DEFAULT_S_WF: int = +1   #wallfollowing side
-DEFAULT_CONTROL_OMEGA : float = 0.5  #works with 0.5
-DEFAULT_CONTROL_VELOCITY: float = 0.2
-DEFAULT_WFSTATE : int = -1
-DEFAULT_THRESHOLD_DISTANCE : float = 0.04
 
 def run(
         drone=DEFAULT_DRONES,
@@ -57,11 +52,7 @@ def run(
         labyrinth_id=DEFAULT_LABYRINTH_ID,
         output_folder=DEFAULT_OUTPUT_FOLDER,
         colab=DEFAULT_COLAB,
-        s_WF=DEFAULT_S_WF,
-        c_omega=DEFAULT_CONTROL_OMEGA,
-        c_vel=DEFAULT_CONTROL_VELOCITY,
-        WFstate=DEFAULT_WFSTATE, 
-        td=DEFAULT_THRESHOLD_DISTANCE
+
         ):
     
     ### definisci le posizioni iniziali dei droni
@@ -99,16 +90,12 @@ def run(
                     max_sensors_range = max_sensors_range,
                     ref_distance = ref_distance,
                     output_folder='output_folder',
-                    s_WF=s_WF,
-                    c_omega=c_omega,
-                    c_vel=c_vel,
-                    WFstate=WFstate,
-                    td=td               
+                                   
                     )
     
     #### Initialize the controllers ############################
     if drone in [DroneModel.CF2X, DroneModel.CF2P]:
-        ctrl = [DSLPIDControl(drone_model=drone) for i in range(num_drones)]
+        ctrl = [Vel_AngVel_PIDControl(drone_model=drone) for i in range(num_drones)]
 
     #### Obtain the PyBullet Client ID from the environment ####
     PYB_CLIENT = env.getPyBulletClient()
@@ -130,11 +117,9 @@ def run(
         obs, observation, reward, terminated, truncated, info = env.step(action)
 
         #### Compute control for the current way point #############
-        TARGET_POS , TARGET_RPY , TARGET_VEL , TARGET_RPY_RATES = env.NextWP(obs,observation)       
-
-        # velocity control PLACEHOLDER #TO BE IMPLEMENTED
-        #TARGET_VEL , TARGET_RPY_RATES = env.NextWP_VEL(obs,observation) #
-
+        TARGET_POS , TARGET_RPY , TARGET_VEL , TARGET_RPY_RATES = env.NextWP(obs,observation)        
+        # velocity control check (no target_pos input)
+        #TARGET_VEL , TARGET_RPY_RATES = env.NextWP_VEL(obs,observation)
         # applica i controlli in modo da raggiungere un certo punto con un certa velocità
         for j in range(num_drones) :
             action[j, :], _, _ = ctrl[j].computeControlFromState(control_timestep=env.CTRL_TIMESTEP,
@@ -142,7 +127,7 @@ def run(
                                                                     target_pos=TARGET_POS[j],
                                                                     target_rpy=TARGET_RPY[j],
                                                                     target_vel = TARGET_VEL[j],
-                                                                    target_rpy_rates = TARGET_RPY_RATES[j]
+                                                                    #target_rpy_rates = TARGET_RPY_RATES[j]
                                                                     )
        
         #### Log the simulation ####################################
