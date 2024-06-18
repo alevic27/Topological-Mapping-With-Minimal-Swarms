@@ -311,6 +311,7 @@ class MapAviary(ProjAviary):
                     self.WFSTATE[i] = 0 #sto girando vedo il muro ma non sono allineato, mi devo girare    
         
         return omega , vel , self.WFSTATE
+
     ################################################################################
 
     def _WallFollowing2(self):    #ALG B.1
@@ -495,7 +496,9 @@ class MapAviary(ProjAviary):
             #omega[i] = ([0.5])
             #vel [i] = ([0.2])            
         return omega , vel , self.WFSTATE
+    
     ################################################################################
+
     def _WallFollowingandAlign(self , nth_drone):    #ALG B.2  versione con solo il sensore davanti, credo necessiti di un meccanismo di memoria
         """funzione per seguire il muro -> mi da la omega mentre sto navigando vicino al muro per evitare di allontanarmi dal muro
         Returns
