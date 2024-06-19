@@ -7,7 +7,7 @@ import numpy as np
 import csv
 
 from gym_pybullet_drones.utils.Logger import Logger
-from project.envs.MapAviary import MapAviary
+from project.envs.MapAviary2 import MapAviary
 from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
 from gym_pybullet_drones.utils.utils import sync, str2bool
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType
@@ -34,13 +34,13 @@ DEFAULT_IMG_RES = np.array([64, 48])
 
 DEFAULT_SENSORS_ATTRIBUTES = True
 DEFAULT_SENSORS_RANGE = 4.
-DEFAULT_REF_DISTANCE = 0.3
+DEFAULT_REF_DISTANCE = 0.75
 DEFAULT_LABYRINTH_ID = "2t"  # "0" per i 4 oggettini di BaseRLAviary, "lettera" della versione del labirinto 
 DEFAULT_S_WF: int = +1   #wallfollowing side
 DEFAULT_CONTROL_OMEGA : float = 0.5  #works with 0.5
 DEFAULT_CONTROL_VELOCITY: float = 0.2
 DEFAULT_WFSTATE : int = -1
-DEFAULT_THRESHOLD_DISTANCE : float = 0.04
+DEFAULT_THRESHOLD_DISTANCE : float = 0.03
 
 def run(
         drone=DEFAULT_DRONES,
@@ -66,12 +66,13 @@ def run(
     
     ### definisci le posizioni iniziali dei droni
     H_ini = 1.
-    X_ini = 0.
+    X_ini = -3.
     Y_ini = 0.
     Y_STEP_ini = .05
+    Yaw_ini = -0.7
     #posizione e attitude iniziale per ogni drone 
     INIT_XYZS = np.array([[X_ini,Y_ini+i*Y_STEP_ini, H_ini] for i in range(num_drones)])
-    INIT_RPYS = np.array([[0., 0., 0.] for i in range(num_drones)])
+    INIT_RPYS = np.array([[0., 0., Yaw_ini] for i in range(num_drones)])
     
     ### WP target
 
