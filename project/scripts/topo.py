@@ -38,7 +38,7 @@ DEFAULT_REF_DISTANCE = 0.75
 DEFAULT_LABYRINTH_ID = "2t"  # "0" per i 4 oggettini di BaseRLAviary, "lettera" della versione del labirinto 
 DEFAULT_S_WF: int = +1   #wallfollowing side
 DEFAULT_CONTROL_OMEGA : float = 0.5  #works with 0.5
-DEFAULT_CONTROL_VELOCITY: float = 0.2
+DEFAULT_CONTROL_VELOCITY: float = 0.2  #works with 0.2
 DEFAULT_WFSTATE : int = -1
 DEFAULT_THRESHOLD_DISTANCE : float = 0.03
 
@@ -122,6 +122,10 @@ def run(
                     colab=colab
                     )
     
+    #### Initialize the topological map database ###############
+    for i in range(num_drones) : 
+        env.add_drone(i)
+
     #### Run the simulation ####################################
     action = np.zeros((num_drones,4))
     START = time.time()

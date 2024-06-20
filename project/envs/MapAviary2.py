@@ -111,10 +111,14 @@ class MapAviary(ProjAviary):
         ###################################### (se questa è maggiore di DISTREF si entrerà in state -1)
         ###################################### (se è minore di DISTREF tocca inventare uno stato di allontanamento ortogonale)
         # il terzo si aggiorna insieme al secondo e indica la direzione della distanza minima in qualche modo
+        self.state1counter = np.array([[0] for j in range(self.NUM_DRONES)] )
         self.state4counter = np.array([[0] for j in range(self.NUM_DRONES)] )
         self.td = td ## threshold distance to determine wether the drone is almost at reference distance from wall
         self.WF_ref_angle = np.array([[0.] for j in range(self.NUM_DRONES)] ) # yaw di riferimento di start dello stato 1 per non allontanarsi troppo dalla direzione parallela
 
+        ## database init
+        self.drones_db = {} 
+        self.adjacency_matrices = []
     ################################################################################
 
     def NextWP(self,obs,observation): #Aggiungere gli input necessari
@@ -397,7 +401,7 @@ class MapAviary(ProjAviary):
                 omega [i] = ([0])
                 vel [i] = np.dot(  cv , [1. , 0. , 0.] )
                 if self.distance[i][1] - self.DIST_WALL_REF < self.td:
-                    self.WFSTATE[i] = 0
+                    self._SwitchWFSTATE(i, 0)
                     self.wfstatezero_debugger[i] = [0. , np.inf , 0.]
                     print("esco da WFSTATE = 3 e entro in WFSTATE = 0")
                     ### scelta unica del S_WF per il drone ###
@@ -419,21 +423,23 @@ class MapAviary(ProjAviary):
                     print("differenza tra range destro e range destro precedente: ",np.abs(rR - self.prev_rR[i][0]))
                     if np.abs(rB - self.DIST_WALL_REF) < self.td and np.abs(rR - self.DIST_WALL_REF) < self.td: # se dietro e destra so circa ar top
                         if rR != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.01 : # TODO: aggiusta sensibilità
-                            self.WFSTATE[i] = 1
+                            self._SwitchWFSTATE(i, 1)
+                            self.state1counter[i][0] = 0
                             self.WF_ref_angle[i] = self.rpy[i][2]
                             print("esco da WFSTATE = 0 (in un convesso) e entro in WFSTATE = 1")
                     elif rR != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.01 :  
-                        self.WFSTATE[i] = 3
+                        self._SwitchWFSTATE(i, 3)
                         print("esco da WFSTATE = 0 (causa parallelo al muro destro) e entro in WFSTATE = 3")
                 elif self.S_WF == -1: # wallfollowing con muro a sinistra                    
                     print("differenza tra range sinistro e range sinistro precedente: ",np.abs(rL - self.prev_rL[i][0]))
                     if np.abs(rB - self.DIST_WALL_REF) < self.td and np.abs(rL - self.DIST_WALL_REF) < self.td: # se dietro e sinistra so circa ar top
                         if rL != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.01 : # TODO: aggiusta sensibilità
-                            self.WFSTATE[i] = 1
+                            self._SwitchWFSTATE(i, 1)
+                            self.state1counter[i][0] = 0
                             self.WF_ref_angle[i] = self.rpy[i][2]
                             print("esco da WFSTATE = 0 (in un convesso) e entro in WFSTATE = 1")
                     elif rL != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.01 :    
-                        self.WFSTATE[i] = 3
+                        self._SwitchWFSTATE(i, 3)
                         print("esco da WFSTATE = 0 (causa parallelo al muro destro) e entro in WFSTATE = 3")
         ######### 0-STATE debugger, starta solo se non sono uscito da 0 per nessun altro motivo #####
         ######### TODO: da rifare con lo spost laterale
@@ -446,11 +452,11 @@ class MapAviary(ProjAviary):
                 else: 
                     if self.wfstatezero_debugger[i][1] > self.DIST_WALL_REF : # lontano
                         if np.abs( (self.wfstatezero_debugger[i][0] - (2*np.pi) ) - self.wfstatezero_debugger[i][2] ) < self.td*2 : 
-                            self.WFSTATE[i] = -1
+                            self._SwitchWFSTATE(i, -1)
                             print("esco da WFSTATE = 0 per DEBUG troppo lontano e entro in WFSTATE = -1")
                     elif self.wfstatezero_debugger[i][1] < self.DIST_WALL_REF: #vicino
                         if np.abs( (self.wfstatezero_debugger[i][0]- (2*np.pi) ) - (self.wfstatezero_debugger[i][2] - (np.pi) ))  < self.td*2 :
-                            self.WFSTATE[i] = -1
+                            self._SwitchWFSTATE(i, -1)
                             print("esco da WFSTATE = 0 per DEBUG troppo vicino e entro in WFSTATE = -1")
                     else:
                         print("ERROR NON DEBUGGA LO STATO 0")
@@ -460,24 +466,29 @@ class MapAviary(ProjAviary):
             elif self.WFSTATE[i] == 1 : # wallfollowing
                 vel [i] = np.dot(  cv , [1. , 0. , 0.] ) 
                 omega[i] = self._WallFollowingandAlign2(i)  
+                self.state1counter[i][0] += 1
                 if self.S_WF == 1: # wallfollowing con muro a destra
                     if np.abs(rF - self.DIST_WALL_REF) < 3*self.td and np.abs(rR - self.DIST_WALL_REF) < 3*self.td :
-                        self.WFSTATE[i] = 0
+                        self._SwitchWFSTATE(i, 0)
                         self.wfstatezero_debugger[i] = [0. , np.inf , 0.]
                         print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo")
                     if np.abs(self.prev_rR[i][0] - rR) > 1.2*self.td: #condizione con la storia di rR
-                        self.WFSTATE[i] = 2 #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
+                        self._SwitchWFSTATE(i, 2) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
                         print("esco da WFSTATE = 1 e entro in WFSTATE = 2")
                         self.turn_start_yaw[i][0] = 0
                 elif self.S_WF == -1: # wallfollowing con muro a sinistra
                     if np.abs(rF - self.DIST_WALL_REF) < 5*self.td and np.abs(rL - self.DIST_WALL_REF) < 5*self.td :
-                        self.WFSTATE[i] = 0
+                        self._SwitchWFSTATE(i, 0)
                         self.wfstatezero_debugger[i] = [0. , np.inf , 0.]
                         print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo")
                     if np.abs(self.prev_rL[i][0] - rL) > 1.2*self.td: #condizione con la storia di rR
-                        self.WFSTATE[i] = 2 #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
+                        self._SwitchWFSTATE(i, 2) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
                         print("esco da WFSTATE = 1 e entro in WFSTATE = 2")
                         self.turn_start_yaw[i][0] = 0
+                ###### Topological
+                if self.state1counter[i][0] == 100:
+                    self.add_point(i,self.pos[i],'corridor')
+                    self.state1counter[i][0] = 0
                         
         ######################  STATO 2 : CURVA  ############################
         ### possibili migliorie: - rimuovere la cosa che dopo va in 3 e farlo andare in 0
@@ -492,14 +503,15 @@ class MapAviary(ProjAviary):
                         print("la differenza tra il range destro attuale e precedente è:", np.abs(rR - self.prev_rR[i][0]) )
                         print("la tolleranza per passare a 3 è", self.td*0.002)
                         if self.prev_rR[i][0] != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.002 :
-                            self.WFSTATE[i] = 3
+                            self._SwitchWFSTATE(i, 3)
                             print("esco da WFSTATE = 2 e entro in WFSTATE = 3 poichè sono abbastanza allineato col muro")
                         if rR == self.MAX_RANGE:
-                            self.WFSTATE[i] = 4
+                            self._SwitchWFSTATE(i, 4)
+                            self.state4counter[i][0] = 0
                     elif self.S_WF == -1: # wallfollowing con muro a sinistra
                         print("la differenza tra il range sinistro attuale e precedente è:", np.abs(rL - self.prev_rL[i][0]) )
                         if self.prev_rL[i][0] != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.002 :
-                            self.WFSTATE[i] = 3
+                            self._SwitchWFSTATE(i, 3)
                             print("esco da WFSTATE = 2 e entro in WFSTATE = 3 poichè sono abbastanza allineato col muro")
 
         ######################  STATO 3 : POST-0 AVVICINAMENTO A DISTWALLREF  ############################
@@ -511,7 +523,8 @@ class MapAviary(ProjAviary):
                 vel [i] = np.dot(  cv , [1. , 0. , 0.] )
                 if self.S_WF == 1: # wallfollowing con muro a destra
                     if np.abs(rR - self.DIST_WALL_REF) < self.td*0.5:
-                        self.WFSTATE[i] = 1
+                        self._SwitchWFSTATE(i, 1)
+                        self.state1counter[i][0] = 0
                         self.WF_ref_angle[i] = self.rpy[i][2]
                         print("esco da WFSTATE = 3 e entro in WFSTATE = 1 poichè sono alla dist giusta dal muro")
                     elif rR > self.DIST_WALL_REF:
@@ -520,7 +533,8 @@ class MapAviary(ProjAviary):
                         vel[i] = np.dot(  cv , [1. , +1. , 0.] )
                 elif self.S_WF == -1: # wallfollowing con muro a sinistra
                     if np.abs(rL - self.DIST_WALL_REF) < self.td*0.5:
-                        self.WFSTATE[i] = 1
+                        self._SwitchWFSTATE(i, 1)
+                        self.state1counter[i][0] = 0
                         self.WF_ref_angle[i] = self.rpy[i][2]
                         print("esco da WFSTATE = 3 e entro in WFSTATE = 1 poichè sono alla dist giusta dal muro")
                     elif rL > self.DIST_WALL_REF:
@@ -537,7 +551,7 @@ class MapAviary(ProjAviary):
                 self.state4counter[i][0] += 1
                 print(self.state4counter[i][0])
                 if self.state4counter[i][0] > 20 :
-                    self.WFSTATE[i] = 3
+                    self._SwitchWFSTATE(i, 3)
                     print("esco da WFSTATE = 4 e entro in WFSTATE = 3 ")   
 
             print("vel=", vel[i])
@@ -550,7 +564,27 @@ class MapAviary(ProjAviary):
             #vel [i] = ([0.2])            
         return omega , vel , self.WFSTATE
     
-    ################################################################################    
+    ################################################################################
+    
+    def _SwitchWFSTATE(self, nth_drone, new_WFSTATE):
+        """funzione per passare a un nuovo WFSTATE , sostituisce self.WFSTATE[i] = 3 
+        Parameters
+        ---------
+        nth_drone: int
+        new_WFSTATE : int
+            nuovo WFSTATE a cui passare
+        """
+        old_WFSTATE = self.WFSTATE[nth_drone][0]  # might use to print stuff
+        self.WFSTATE[nth_drone][0] = new_WFSTATE
+        print(old_WFSTATE, ">>", new_WFSTATE)
+        if new_WFSTATE == 1:
+            self.add_point(nth_drone,self.pos[nth_drone],'corridor')
+        if old_WFSTATE == 1 and new_WFSTATE == 2: # inizio curva
+            self.add_point(nth_drone,self.pos[nth_drone],'junction')
+        if old_WFSTATE == 2: # fine curva
+            if new_WFSTATE == 0 or new_WFSTATE == 3 or new_WFSTATE == 4:
+                self.add_point(nth_drone,self.pos[nth_drone],'junction')    
+
 
     def _WallFollowingandAlign(self , nth_drone):    #ALG B.2  versione con solo il sensore davanti, credo necessiti di un meccanismo di memoria
         """funzione per seguire il muro -> mi da la omega mentre sto navigando vicino al muro per evitare di allontanarmi dal muro
@@ -616,7 +650,6 @@ class MapAviary(ProjAviary):
             lat_distance = lat_distance * np.cos(alfa)
             prev_lat_distance = self.prev_rL[nth_drone][0]
             
-
         if np.abs(self.DIST_WALL_REF-lat_distance) > self.td : # sono fuori dalla regione accettabile ( o troppo lontano (distance > dist_wall_ref)) o troppo vicino  (distance < dist_wall_ref)
             if lat_distance > self.DIST_WALL_REF : #and self.rpy[nth_drone][2] < self.WF_ref_angle[nth_drone]:     # troppo lontano dal muro
                 omega = ([-self.S_WF[nth_drone][0]*self.C_OMEGA*outside_region_omega_reduction_factor])        # TODO check sign : CHECKED -
@@ -691,5 +724,194 @@ class MapAviary(ProjAviary):
             #else:
             #    self.S_WF[i] = 1  # preferenza antioraria
         return NWdistance,SWdistance,SEdistance,NEdistance
+    
+############################## CREAZIONE MAPPA TOPOLOGICA ############################################
+## il database si chiama 
+## self.drones_db
+## la matrice di adiacenza è una sola
+## self.adjacency_matrix
 
+    def add_drone(self,
+                  drone_id):
+        """Aggiunge un drone col suo id nel database come chiave di primo livello drone_id
+           e inizializza la matrice di adiacenza aggiungendo una matrice (1x1) con uno zero alla lista di matrici nota come self.adjacency_matrices
+           Runnare in fase di inizializzazione
+        Parameters
+        -------
+        drone_id: int
+            id del drone da aggiungere
+        """
+        if drone_id not in self.drones_db:
+            self.drones_db[drone_id] = {}
+            adjacency_matrix = np.zeros((1, 1), dtype=int)
+            self.adjacency_matrices.append(adjacency_matrix)
 
+    def get_next_point_id(self,
+                          drone_id):
+        """restituisce il prossimo point_id inseribile nel dizionario del drone con un certo drone_id
+        Parameters
+        -------
+        drone_id: int
+            id del drone di cui voglio sapere quale sarebbe il prossimo point_id
+
+        Returns
+        -------
+        string : 'xxxx'
+            stringa col prossimo point_id
+        """
+        if drone_id not in self.drones_db:
+            return '0001'
+        else:
+            existing_ids = sorted(int(pid) for pid in self.drones_db[drone_id].keys())
+            next_id = existing_ids[-1] + 1 if existing_ids else 1
+            return f'{next_id:04}'
+        
+    def add_point(self,
+                  drone_id,
+                  coords,
+                  point_type):
+        """aggiunge un punto al database del drone selezionato
+        Parameters
+        -------
+        drone_id : int
+            id del drone alla cui lista voglio aggiungere un punto
+        coords : ndarray
+            (3)-shaped array con le coord del punto
+        point_type : string
+            può essere 'corridor', 'juction', 'corner' #TODO: creare una logica di determinazione         
+        """
+        if drone_id not in self.drones_db:
+            self.drones_db[drone_id] = {}
+        ### aggiunta nuova chiave al dizionario
+        point_id = self.get_next_point_id(drone_id)
+        self.drones_db[drone_id][point_id] = {'coords': coords, 'type': point_type}
+        print(f'Added point {point_id} to drone {drone_id}')
+        ### aggiunta nuova riga e colonna alla matrice[drone_id]
+        current_matrix = self.adjacency_matrices[drone_id]
+        num_nodes = len(self.drones_db[drone_id])
+        if num_nodes > 1:
+            # Creiamo una nuova matrice con una dimensione aumentata di 1
+            new_matrix = np.zeros((num_nodes , num_nodes ), dtype=int)
+            # Copiamo i valori della matrice corrente nella nuova matrice
+            new_matrix[:num_nodes-1, :num_nodes-1] = current_matrix
+            # Aggiorniamo la lista delle matrici di adiacenza
+            self.adjacency_matrices[drone_id] = new_matrix
+        if point_type == 'corridor':
+            color = [1, 0, 0, 1] # red
+        elif point_type == 'junction':
+            color = [0, 1, 0, 1] # green
+        self.add_visual_ball(coords, color)
+
+    def add_edge(self,
+                 drone_id,
+                 point_key1,
+                 point_key2):
+        """Da runnare dopo add_point
+        scelto un drone drone_id, aggiunge il collegamento (edge) tra un nodo 1 e un nodo 2 
+        Parameters
+        -------
+        drone_id: int
+            id del drone in questione
+        point_key1: str
+            key del nodo 1 
+        point_key2: str
+            key del nodo 2
+        """
+        keys = list(self.drones_db[drone_id].keys())
+        idx1 = keys.index(point_key1)
+        idx2 = keys.index(point_key2)
+        self.adjacency_matrices[drone_id][idx1, idx2] = 1
+        self.adjacency_matrices[drone_id][idx2, idx1] = 1
+
+    def euclidean_distance(self,
+                           point1,
+                           point2):
+        """Distanza euclidea tra due nparray di qualsiasi dimensione
+        Parameters
+        -------
+        point1: ndarray 
+        point2: ndarray 
+        """
+        return np.linalg.norm(np.array(point1) - np.array(point2))
+
+    def merge_similar_points_2_drones(self,
+                                      drone1_id,
+                                      drone2_id,
+                                      threshold=0.5):
+        """ confronto incrociato tra i nodi di 2 droni diversi e sostituisce con la media #TODO: aggiusta sensibilità
+        Parameters
+        -------
+        drone1_id: ndarray 
+        drone2_id: ndarray
+        threshold: float - optional
+        """
+        drone1_points = self.drones_db[drone1_id]
+        drone2_points = self.drones_db[drone2_id]
+        for id1, data1 in drone1_points.items():
+            for id2, data2 in drone2_points.items():
+                if self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
+                    new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist()
+                    self.drones_db[drone1_id][id1]['coords'] = new_coords
+                    self.drones_db[drone2_id][id2]['coords'] = new_coords
+
+    def remove_point(self,
+                     drone_id,
+                     point_id):
+        """rimuove un punto al database del drone selezionato
+        Parameters
+        -------
+        drone_id : int
+            id del drone dalla cui lista voglio rimuovere un punto
+        point_id : str  
+            'xxxx' string 
+        """
+        if drone_id in self.drones_db and point_id in self.drones_db[drone_id]:
+            del self.drones_db[drone_id][point_id]
+            print(f'Removed point {point_id} from drone {drone_id}')
+        else:
+            print(f'Point {point_id} not found for drone {drone_id}')
+
+    def display_drones_db(self):
+        """mostra l'intero database
+        """
+        for drone_id, points in self.drones_db.items():
+            print(f"Drone {drone_id}:")
+            for point_id, details in points.items():
+                print(f"  Point {point_id}: {details}")
+
+    def add_visual_ball(self,
+                        position,
+                        color=[1, 0, 0, 1],
+                        radius=0.03,
+                        ):
+        """crea un pallino colorato senza collisioni in un punto
+        --------
+        Parametres
+        position: ndarray (3) 
+            position of the pallino
+        color: ndarray (4) 
+            RGBA-format color
+        radius: float - optional
+        """
+        visual_shape_id = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=radius, rgbaColor=color)
+        ball_id = p.createMultiBody(baseMass=0, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+        return ball_id
+    
+    def add_visual_line(self,
+                        point_a,
+                        point_b,
+                        color=[0, 0, 1, 1],
+                        width=1):
+        """crea una linea colorata senza collisioni da un punto a a un punto b
+        --------
+        Parametres
+        point_a: ndarray (3) 
+            posizione di partenza
+        point_b: ndarray (3) 
+            posizione di fine 
+        color: ndarray (3) 
+            RGB-format color
+        width: float - optional
+        """
+        line_id = p.addUserDebugLine(point_a, point_b, color, width)
+        return line_id
