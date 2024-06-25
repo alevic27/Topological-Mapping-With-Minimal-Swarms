@@ -149,12 +149,35 @@ class DroneData:
                 print(f"  Point {point_id}: {details}")
 
 #####################################################################################################################
-
+    def distance_between_newpoint_and_oldpoints(self,
+                                                drone_id,
+                                                coords,
+                                                ):
+        """ da runnare in add_point. distanza minima tra l'eventuale nuovo nodo e nodo più vicino già nel dizionario#TODO: aggiusta sensibilità
+        Parameters
+        -------
+        drone_id: int 
+            id del drone alla cui lista voglio aggiungere un punto
+        coords : ndarray
+            (3)-shaped array con le coord del punto
+        
+        Returns
+        -------
+        float
+            distanza minima
+        """
+        drone_points = self.drones_db[drone_id]
+        min_dist = 5.0
+        for id, data in drone_points.items():
+            if self.euclidean_distance(data['coords'], coords) < min_dist:
+                min_dist = self.euclidean_distance(data['coords'], coords)
+        return min_dist
+    
 # Esempio di utilizzo
 graph = DroneData()
 
 # Aggiungere alcuni droni
-for i in range(2) :
+for i in range(3) :
     graph.add_drone(i)
 
 print(graph.drones_db)
@@ -168,15 +191,22 @@ graph.add_point(1, [4.3, 2.4, 1.0], 'crossway')
 graph.add_point(1, [3.7, 2.3, 1.0], 'corridor')
 graph.add_point(1, [3.1, 2.5, 1.0], 'corridor')
 
+graph.add_point(2, [4.3, 2.4, 1.0], 'crossway')
+graph.add_point(2, [3.1, 2.3, 1.0], 'corridor')
+graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
 # Visualizzare i dati
 print("Dati dopo l'aggiunta dei punti:")
 graph.display_drones_db()
-
+graph.drones_db[0]['0004'] = {'coords': [1., 1., 1.0], 'type': 'prova'}
 # merging
-graph.display_drones_db()
-graph.merge_similar_points_2_drones(0,1)
+# graph.display_drones_db()
+# graph.merge_similar_points_2_drones(0,1)
+# graph.display_drones_db()
 graph.display_drones_db()
 
 # aggiungere edge
 graph.add_edge(1,'0001','0003')
 print(graph.adjacency_matrices)
+
+min_dist = graph.distance_between_newpoint_and_oldpoints(1, [3.2, 2.5, 1.0])
+print(min_dist)

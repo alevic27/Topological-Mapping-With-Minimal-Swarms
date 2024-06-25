@@ -7,7 +7,7 @@ import numpy as np
 import csv
 
 from gym_pybullet_drones.utils.Logger import Logger
-from project.envs.MapAviary2 import MapAviary
+from project.envs.MapAviary import MapAviary
 from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
 from gym_pybullet_drones.utils.utils import sync, str2bool
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType
