@@ -138,7 +138,6 @@ class ProjAviary(CtrlAviary):
         if self.SENSOR_ATTR:
             observation, Hit_point = self._sensorsObs()
             self._storeHitPoints(Hit_point)
-            print("hitpoint destro : "  , Hit_point[0][3])
 
         # TODO definire _storeHitPoints(self)
 
