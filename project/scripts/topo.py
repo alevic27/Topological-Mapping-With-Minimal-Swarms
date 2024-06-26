@@ -71,9 +71,21 @@ def run(
     Y_STEP_ini = .05
     Yaw_ini = -0.7
     #posizione e attitude iniziale per ogni drone 
-    INIT_XYZS = np.array([[X_ini,Y_ini+i*Y_STEP_ini, H_ini] for i in range(num_drones)])
-    INIT_RPYS = np.array([[0., 0., Yaw_ini] for i in range(num_drones)])
-    
+    INIT_XYZS = np.array([
+        [-3.0, 0., 1.0]
+    ])
+    #INIT_XYZS = np.array([
+    #    [-3.0, 0., 1.0],
+    #    [-3.2, 0., 1.2]
+    #    ])
+    INIT_RPYS = np.array([
+        [0., 0., -0.5]
+        ])
+    #INIT_RPYS = np.array([
+    #    [0., 0., -0.5],
+    #    [0., 0., +0.5]
+    #    ])
+
     ### WP target
 
     timer = 0
