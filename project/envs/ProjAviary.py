@@ -258,13 +258,13 @@ class ProjAviary(CtrlAviary):
         Hit_point = []
         Hit_point = np.array([[[np.inf , np.inf , np.inf] for j in range(self.NUM_SENSORS)]for i in range(self.NUM_DRONES)] )
         if self.SENSOR_ATTR:
-            self.sensor_direction = np.array([
+            for i in range(self.NUM_DRONES):
+                self.sensor_direction = np.array([
                                         [1.0, 0.0, 0.0],   # front
                                         [0.0, 1.0, 0.0],   # Lx                                        
                                         [-1.0, 0.0, 0.0],  # behind
                                         [0.0, -1.0, 0.0],  # Rx
-                                        ]) 
-            for i in range(self.NUM_DRONES):         
+                                        ])         
                 self.sensor_position = self._getDroneStateVector(i)[0:3]  # [1. 1. 1.] posizione
                 self.rot_mat = np.array(p.getMatrixFromQuaternion(self.quat[i, :])).reshape(3, 3) #TODO vedi ste cazzo di rotazioni
                 self.sensor_direction = np.dot(self.sensor_direction,self.rot_mat.T)   

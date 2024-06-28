@@ -389,7 +389,7 @@ class MapAviary(ProjAviary):
         state_2_omega_coeff = 0.95  # <1 per allargare il raggio di curvatura del WFSTATE = 2
         time_step  = 1 / self.CTRL_FREQ
         for i in range(self.NUM_DRONES) :
-            print("er WFSTATE è",self.WFSTATE[i])
+            print("er WFSTATE del drone" , i , "è", self.WFSTATE[i])
             rF = self.observation[i][0] # distanza frontale
             rL = self.observation[i][1] # distanza sinistra
             rB = self.observation[i][2] # distanza retro
@@ -698,7 +698,7 @@ class MapAviary(ProjAviary):
         alfa = self.rpy[nth_drone][2] - self.WF_ref_angle[nth_drone]  # pos se sbando verso sinistra
                                                                       # neg se sbando verso destra
         alfa = self._anglefix(alfa)
-        
+
         if self.S_WF[nth_drone][0] == 1: # wallfollowing con muro a destra
             lat_distance = self.observation[nth_drone][3] # distanza destra
             #lat_distance = lat_distance * np.cos(alfa)

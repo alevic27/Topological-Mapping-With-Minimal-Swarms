@@ -22,7 +22,7 @@ DEFAULT_ACT = ActionType('one_d_rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' o
 DEFAULT_AGENTS = 2
 
 DEFAULT_DRONES = DroneModel("cf2x")
-DEFAULT_NUM_DRONES = 1
+DEFAULT_NUM_DRONES = 2
 DEFAULT_PHYSICS = Physics("pyb")
 DEFAULT_GUI = True
 DEFAULT_PLOT = True
@@ -65,24 +65,26 @@ def run(
         ):
     
     ### definisci le posizioni iniziali dei droni
-    H_ini = 1.
-    X_ini = -3.
-    Y_ini = 0.
-    Y_STEP_ini = .05
-    Yaw_ini = -0.7
     #posizione e attitude iniziale per ogni drone 
     INIT_XYZS = np.array([
         [-3.0, 0., 1.0]
     ])
-    #INIT_XYZS = np.array([
-    #    [-3.0, 0., 1.0],
-    #    [-3.2, 0., 1.2]
-    #    ])
+    INIT_XYZS = np.array([
+        [-3.0, 0., 1.0],
+        [-3.2, 0., 1.2]
+        ])
     INIT_RPYS = np.array([
         [0., 0., -0.5]
         ])
+    INIT_RPYS = np.array([
+        [0., 0., -0.5],
+        [0., 0., +0.5]
+        ])
+
+    #INIT_XYZS = np.array([
+    #    [-3.2, 0., 1.2]
+    #    ])
     #INIT_RPYS = np.array([
-    #    [0., 0., -0.5],
     #    [0., 0., +0.5]
     #    ])
 
