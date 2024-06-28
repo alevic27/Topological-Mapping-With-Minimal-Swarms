@@ -34,6 +34,7 @@ class MapAviary(ProjAviary):
                  output_folder='results',
                  WFstate : int = 1,
                  td : float = 0.02,
+                 merging_graphs=False ,
                  ):
         
         """Initialization of an environment with drones capable of performing topological mapping.
@@ -89,7 +90,7 @@ class MapAviary(ProjAviary):
                          labyrinth_id=labyrinth_id,
                          sensors_attributes=sensors_attributes,
                          max_sensors_range=max_sensors_range,
-                         output_folder=output_folder
+                         output_folder=output_folder,
                          )
         
         self.DIST_WALL_REF = ref_distance  # distanza di riferimento dal muro
@@ -119,6 +120,8 @@ class MapAviary(ProjAviary):
         ## database init
         self.drones_db = {} 
         self.adjacency_matrices = []
+        self.custom_id_balls_map = {}
+        self.MERGING = merging_graphs
     ################################################################################
 
     def NextWP(self,obs,observation): #Aggiungere gli input necessari
@@ -883,7 +886,10 @@ class MapAviary(ProjAviary):
                 color = [1, 0, 0, 1] # red
             elif point_type == 'junction':
                 color = [0, 1, 0, 1] # green
-            self.add_visual_ball(coords, color)
+            self.add_visual_ball(drone_id, point_id, coords, color)
+        if self.MERGING:
+            for i in range(self.NUM_DRONES):
+                self.merge_similar_points_2_drones(drone_id,i)
 
     def add_edge(self,
                  drone_id,
@@ -925,7 +931,7 @@ class MapAviary(ProjAviary):
     def merge_similar_points_2_drones(self,
                                       drone1_id,
                                       drone2_id,
-                                      threshold=0.5):
+                                      threshold=1):
         """ confronto incrociato tra i nodi di 2 droni diversi e sostituisce con la media #TODO: aggiusta sensibilità
         Parameters
         -------
@@ -935,12 +941,21 @@ class MapAviary(ProjAviary):
         """
         drone1_points = self.drones_db[drone1_id]
         drone2_points = self.drones_db[drone2_id]
-        for id1, data1 in drone1_points.items():
-            for id2, data2 in drone2_points.items():
-                if self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
-                    new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist()
-                    self.drones_db[drone1_id][id1]['coords'] = new_coords
-                    self.drones_db[drone2_id][id2]['coords'] = new_coords
+        if drone1_id != drone2_id:
+            for point_id_drone1, data1 in drone1_points.items():
+                for point_id_drone2, data2 in drone2_points.items():
+                    if self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
+                        new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist()
+                        #sostituisco le coordinate medie al posto di quelle del drone 1
+                        self.drones_db[drone1_id][point_id_drone1]['coords'] = new_coords
+                        #rimuovo la palletta
+                        self.remove_visual_ball(drone1_id,point_id_drone1)
+                        #sostituisco le coordinate medie al posto di quelle del drone 1
+                        self.drones_db[drone2_id][point_id_drone2]['coords'] = new_coords
+                        #rimuovo la palletta
+                        self.remove_visual_ball(drone2_id,point_id_drone2)
+                        #aggiungo una sola palletta dandola al primo dei due (TODO nota: il secondo avrà una palla in meno nella lista)
+                        self.add_visual_ball(drone1_id,point_id_drone1,new_coords)
 
     def distance_between_newpoint_and_oldpoints(self,
                                                 drone_id,
@@ -980,6 +995,7 @@ class MapAviary(ProjAviary):
         """
         if drone_id in self.drones_db and point_id in self.drones_db[drone_id]:
             del self.drones_db[drone_id][point_id]
+            self.remove_visual_ball(drone_id,point_id)
             print(f'Removed point {point_id} from drone {drone_id}')
         else:
             print(f'Point {point_id} not found for drone {drone_id}')
@@ -993,6 +1009,8 @@ class MapAviary(ProjAviary):
                 print(f"  Point {point_id}: {details}")
 
     def add_visual_ball(self,
+                        drone_id,
+                        point_id,
                         position,
                         color=[1, 0, 0, 1],
                         radius=0.03,
@@ -1000,6 +1018,10 @@ class MapAviary(ProjAviary):
         """crea un pallino colorato senza collisioni in un punto
         --------
         Parametres
+        drone_id : int
+            id del drone dalla cui lista voglio rimuovere un punto
+        point_id : str  
+            'xxxx' string 
         position: ndarray (3) 
             position of the pallino
         color: ndarray (4) 
@@ -1008,8 +1030,31 @@ class MapAviary(ProjAviary):
         """
         visual_shape_id = p.createVisualShape(shapeType=p.GEOM_SPHERE, radius=radius, rgbaColor=color)
         ball_id = p.createMultiBody(baseMass=0, baseVisualShapeIndex=visual_shape_id, basePosition=position)
+        #salva id pallino
+        custom_id = f"{drone_id:03}_{point_id}"
+        self.custom_id_balls_map[custom_id] = ball_id #copy?
         return ball_id
     
+    def remove_visual_ball(self,
+                           drone_id,
+                           point_id,
+                           ):
+        """rimuove un pallino colorato di un certo drone
+        --------
+        Parametres
+        drone_id : int
+            id del drone dalla cui lista voglio rimuovere un punto
+        point_id : str  
+            'xxxx' string 
+        """
+        custom_id = f"{drone_id:03}_{point_id}"
+        if custom_id in self.custom_id_balls_map:
+            ball_id = self.custom_id_balls_map[custom_id]
+            p.removeBody(ball_id)
+            del self.custom_id_balls_map[custom_id]
+        else:
+            print(f"Custom ID {custom_id} not found in the list of balls.")
+
     def add_visual_line(self,
                         point_a,
                         point_b,

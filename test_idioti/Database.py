@@ -209,4 +209,9 @@ graph.add_edge(1,'0001','0003')
 print(graph.adjacency_matrices)
 
 min_dist = graph.distance_between_newpoint_and_oldpoints(1, [3.2, 2.5, 1.0])
-print(min_dist)
+print(min_dist,"\n")
+
+
+drone1_points = graph.drones_db[0]
+for point_id , data1 in drone1_points.items():
+    print(point_id)

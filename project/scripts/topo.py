@@ -42,6 +42,8 @@ DEFAULT_CONTROL_VELOCITY: float = 0.2  #works with 0.2
 DEFAULT_WFSTATE : int = -1
 DEFAULT_THRESHOLD_DISTANCE : float = 0.03
 
+DEFAULT_MERGING_GRAPHS_LOGIC = True
+
 def run(
         drone=DEFAULT_DRONES,
         num_drones=DEFAULT_NUM_DRONES,
@@ -61,7 +63,8 @@ def run(
         c_omega=DEFAULT_CONTROL_OMEGA,
         c_vel=DEFAULT_CONTROL_VELOCITY,
         WFstate=DEFAULT_WFSTATE, 
-        td=DEFAULT_THRESHOLD_DISTANCE
+        td=DEFAULT_THRESHOLD_DISTANCE,
+        merging_graphs=DEFAULT_MERGING_GRAPHS_LOGIC,
         ):
     
     ### definisci le posizioni iniziali dei droni
@@ -118,7 +121,8 @@ def run(
                     c_omega=c_omega,
                     c_vel=c_vel,
                     WFstate=WFstate,
-                    td=td               
+                    td=td,
+                    merging_graphs=merging_graphs               
                     )
     
     #### Initialize the controllers ############################
