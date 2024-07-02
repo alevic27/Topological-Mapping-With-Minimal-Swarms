@@ -173,6 +173,26 @@ class DroneData:
                 min_dist = self.euclidean_distance(data['coords'], coords)
         return min_dist
     
+    def get_highest_point_id(self, drone_id):
+        """
+        Restituisce l'ID del punto con il numero più alto già inserito per un dato drone.
+
+        Parameters:
+        drone_id: int
+            L'ID del drone per cui trovare il punto con l'ID più alto.
+
+        Returns:
+        str
+            L'ID del punto con il numero più alto.
+        """
+        point_ids = list(self.drones_db[drone_id].keys())
+        if not point_ids:
+            return None  # Nessun punto esistente per il drone
+
+        highest_point_id = max(point_ids, key=lambda x: int(x))
+        return highest_point_id
+
+
 # Esempio di utilizzo
 graph = DroneData()
 
@@ -194,6 +214,32 @@ graph.add_point(1, [3.1, 2.5, 1.0], 'corridor')
 graph.add_point(2, [4.3, 2.4, 1.0], 'crossway')
 graph.add_point(2, [3.1, 2.3, 1.0], 'corridor')
 graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
+graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
+graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
+graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
+graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
+graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
+graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
+graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
+graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
+graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
+graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
+graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
+graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
+graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
+
+
+del graph.drones_db[2]['0012']
+graph.display_drones_db()
+prossimo_id = graph.get_next_point_id(2)
+print(prossimo_id)
+
+##point_ids = list(graph.drones_db[2].keys())
+##print(point_ids)
+##max_point_id = graph.get_highest_point_id(2)
+##print(max_point_id)
+##print(type(max_point_id))
+
 # Visualizzare i dati
 print("Dati dopo l'aggiunta dei punti:")
 graph.display_drones_db()
@@ -209,4 +255,9 @@ graph.add_edge(1,'0001','0003')
 print(graph.adjacency_matrices)
 
 min_dist = graph.distance_between_newpoint_and_oldpoints(1, [3.2, 2.5, 1.0])
-print(min_dist)
+print(min_dist,"\n")
+
+
+drone1_points = graph.drones_db[0]
+for point_id , data1 in drone1_points.items():
+    print(point_id)
