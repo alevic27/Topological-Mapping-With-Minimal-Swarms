@@ -827,7 +827,7 @@ class MapAviary(ProjAviary):
         """
         if drone_id not in self.drones_db:
             self.drones_db[drone_id] = {}
-            adjacency_matrix = np.zeros((1, 1), dtype=int)
+            adjacency_matrix = np.zeros((0, 0), dtype=int)
             self.adjacency_matrices.append(adjacency_matrix)
 
     def get_next_point_id(self,
@@ -948,22 +948,13 @@ class MapAviary(ProjAviary):
             point_id = self.get_next_point_id(drone_id)
             self.drones_db[drone_id][point_id] = {'coords': coords.copy(), 'type': point_type}
             print(f'Added point {point_id} to drone {drone_id}')
-            ### aggiunta nuova riga e colonna alla adjacencymatrix[drone_id]
+            ### AGGIUNTA NUOVA RIGA E COLONNA alla adjacencymatrix[drone_id]
             current_matrix = self.adjacency_matrices[drone_id]
-            highest_id = self.get_highest_point_id(drone_id)
-            highest_index = self.point_id_to_index(highest_id)  #  '0002' >>> 1
-            if highest_index > 0:
-                # Creiamo una nuova matrice con una dimensione aumentata di 1
-                new_matrix = np.zeros((highest_index+1 , highest_index+1 ), dtype=int)
-                # Copiamo i valori della matrice corrente nella nuova matrice
-                ##### TODO quando diminuiscono i punti è come se dovessi andare da a senza toccare le prime righe
-                # conviene camviare logica e fare che aggiunge una riga e una colonna vuota basandosi sulle dimensioni attuali e non su highest index
-                new_matrix[:highest_index, :highest_index] = current_matrix
-                # Aggiorniamo la lista delle matrici di adiacenza
-                self.adjacency_matrices[drone_id] = new_matrix
-
+            # Creiamo una nuova matrice con una dimensione aumentata di 1
             new_matrix = np.pad(current_matrix, ((0, 1), (0, 1)), mode='constant', constant_values=0)
-    
+            #highest_id = self.get_highest_point_id(drone_id)
+            #highest_index = self.point_id_to_index(highest_id)  #  '0002' >>> 1
+            self.adjacency_matrices[drone_id] = new_matrix    
             ### AGGIUNTA PALLINO VISIVO ###
             if point_type == 'corridor':
                 color = [1, 0, 0, 1] # red
@@ -973,7 +964,7 @@ class MapAviary(ProjAviary):
             ### AGGIUNTA EDGE ###
             # per ora solo tra nuovo punto e vecchio punto #
             if previous_point_id:
-                self.add_edge(drone_id, previous_point_id, point_id)
+                self.add_edge(drone_id, previous_point_id, point_id) #TODO questo di strano ha che collega il punto all'ultimo in termini di codice che però potrebbe essere figlio di un merge qualsiasi anche in un'altra parte della mappa
             if self.MERGING:
                 for i in range(self.NUM_DRONES):
                     self.merge_similar_points_2_drones3(drone_id,i)
@@ -1118,7 +1109,7 @@ class MapAviary(ProjAviary):
             k = 0
             for point_id_drone1, data1 in drone1_points.items():
                 for point_id_drone2, data2 in drone2_points.items():
-                    if self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
+                    if 0 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
                         new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist()
                         new_type = data1['type']
                         # Accumula le chiavi da rimuovere
@@ -1133,7 +1124,12 @@ class MapAviary(ProjAviary):
                         # Accumula le chiavi con i rispettivi valori da aggiungere
                         to_add_drone1.append((next_point_id_drone1, {'coords': new_coords, 'type': new_type}))
                         to_add_drone2.append((next_point_id_drone2, {'coords': new_coords, 'type': new_type}))
-
+                        # SOSTITUZIONE EDGE NELLA ADJACENCY MATRIX
+                        #self.adjacency_matrices[drone1_id] = np.pad(self.adjacency_matrices[drone1_id], ((0, 1), (0, 1)), mode='constant', constant_values=0)
+                        #self.adjacency_matrices[drone2_id] = np.pad(self.adjacency_matrices[drone2_id], ((0, 1), (0, 1)), mode='constant', constant_values=0)
+                        self.adjacency_matrices[drone1_id] = self.replace_node_in_adjacency_matrix(self.adjacency_matrices[drone1_id],point_id_drone1,next_point_id_drone1)
+                        self.adjacency_matrices[drone2_id] = self.replace_node_in_adjacency_matrix(self.adjacency_matrices[drone2_id],point_id_drone2,next_point_id_drone2)
+                        # in teoria serve un if che se trovo corrispondenza tra il mio 0005 e lo 0004 dell'altro che però 0004 c'è l'ho anche io con le stesse coordinate allora va rimosso anche quello
             # Rimuovi le vecchie istanze e le vecchie palline
             to_remove_drone1 = set(to_remove_drone1) #evita ripetizioni
             to_remove_drone2 = set(to_remove_drone2)
@@ -1150,9 +1146,52 @@ class MapAviary(ProjAviary):
                 self.add_visual_ball(drone1_id, point_id, data['coords'])
             for point_id, data in to_add_drone2:
                 self.drones_db[drone2_id][point_id] = data
-                #self.add_visual_ball(drone2_id, point_id, data['coords']) #uncomment per dare la pallina visiva a entrambi
+                self.add_visual_ball(drone2_id, point_id, np.add(data['coords'],[0,0,0.05])) 
 
             ####### TODO : MANCA LA PARTE CHE MODIFICA LA ADJACENCY MATRIX ##############
+
+    def replace_node_in_adjacency_matrix(self,
+                                         adjacency_matrix,
+                                         old_node_id,
+                                         new_node_id):
+        """
+        Sostituisce un nodo in una matrice di adiacenza con un nuovo nodo, trasferendo tutti gli edge.
+
+        Parameters
+        ----------
+        adjacency_matrix : np.ndarray
+            La matrice di adiacenza.
+        old_node : str
+            L'ID 'xxxx' del nodo da sostituire.
+        new_node : str
+            L'ID 'xxxx' del nuovo nodo.
+
+        Returns
+        -------
+        np.ndarray
+            La nuova matrice di adiacenza con il nodo sostituito.
+        """
+        old_node = self.point_id_to_index(old_node_id)
+        new_node = self.point_id_to_index(new_node_id)
+        
+        num_nodes = adjacency_matrix.shape[0]
+
+        # Creiamo una nuova matrice di adiacenza con una dimensione aumentata di 1
+        new_matrix = np.zeros((num_nodes + 1, num_nodes + 1), dtype=int)
+
+        # Copiamo la matrice di adiacenza originale nella nuova matrice
+        new_matrix[:num_nodes, :num_nodes] = adjacency_matrix
+
+        # Trasferiamo tutti gli edge dal vecchio nodo al nuovo nodo
+        new_matrix[new_node, :-1] = adjacency_matrix[old_node, :]
+        new_matrix[:-1, new_node] = adjacency_matrix[:, old_node]
+
+        # Impostiamo a zero la riga e la colonna del vecchio nodo
+        new_matrix[old_node, :] = 0
+        new_matrix[:, old_node] = 0
+
+        return new_matrix
+
 
     def increment_point_id(self,string,quantity):
         """Incrementa una stringa di point_id del tipo 'xxxx' di quantityù
@@ -1275,6 +1314,7 @@ class MapAviary(ProjAviary):
             print(f"Custom ID {custom_id} not found in the list of balls.")
 
     def add_visual_line(self,
+                        drone_id,
                         point_a,
                         point_b,
                         color=[1, 0, 0],
@@ -1282,6 +1322,8 @@ class MapAviary(ProjAviary):
         """crea una linea colorata senza collisioni da un punto a a un punto b
         --------
         Parametres
+        drone_id : int
+            id del drone dalla cui lista voglio rimuovere un punto
         point_a: ndarray (3) 
             posizione di partenza
         point_b: ndarray (3) 
@@ -1290,28 +1332,48 @@ class MapAviary(ProjAviary):
             RGB-format color
         width: float - optional
         """
+        if drone_id == 0:
+            color = [1, 0, 0] #red
+        elif drone_id == 1:
+            color = [0, 1, 0] #green
+        elif drone_id == 2:
+            color = [0, 0, 1] #blue
+        elif drone_id == 3:
+            color = [1, 1, 0] #yellow
+        elif drone_id == 4:
+            color = [0.5, 0, 0.5] #purple
+        elif drone_id == 5:
+            color = [0, 1, 1] #ciano
         line_id = p.addUserDebugLine(point_a, point_b, color, width)
         return line_id
 
     def show_edges(self):
         """da fare: far si che rimuova tutti gli item di debug tranne le terne orientate solidali ai droni
         """
-        p.removeAllUserDebugItems()
+        p.removeAllUserDebugItems() # TODO: def remove_non_persistent_debug_items(persistent_debug_items):
         for drone_id, adjacency_matrix in enumerate(self.adjacency_matrices):
-            drone_points = self.drones_db[drone_id]  # drone_id è 0-based, quindi aggiungiamo 1
+            drone_points = self.drones_db[drone_id]  
             point_ids = list(drone_points.keys())
-
+            # al momento si basa sull'elenco punti ma si deve basare sulla matrice
             num_points = len(point_ids)
+            point_indexes = []
             for i in range(num_points):
-                for j in range(num_points):
+                point_indexes.append(self.point_id_to_index(point_ids[i])) 
+            for i in point_indexes:
+                for j in point_indexes:
                     if adjacency_matrix[i][j] == 1:
-                        point_a_id = point_ids[i]
-                        point_b_id = point_ids[j]
+                        point_a_id = self.index_to_point_id(i)
+                        point_b_id = self.index_to_point_id(j)
                         point_a_coords = drone_points[point_a_id]['coords']
                         point_b_coords = drone_points[point_b_id]['coords']
-                        self.add_visual_line(point_a_coords, point_b_coords)
+                        self.add_visual_line(drone_id,point_a_coords, point_b_coords)
+            #for i in range(adjacency_matrix.shape[0]):
+            #    for j in range(adjacency_matrix.shape[0]):
+            #        if adjacency_matrix[i][j] == 1:
+            #            point_a_id = 
+            #            point_b_id
   
-    def point_id_to_index(self, point_id):
+    def point_id_to_index(self, point_id:str):
         """
         Converte una stringa di point_id del tipo 'xxxx' nel corrispondente indice Python (intero).
         Params:
@@ -1323,4 +1385,17 @@ class MapAviary(ProjAviary):
             Indice Python corrispondente (0-based).
         """
         return int(point_id) - 1
+    
+    def index_to_point_id(self, index: int):
+        """
+        Converte un indice Python (intero) nel corrispondente stringa di point_id del tipo 'xxxx'.
+        Params:
+        index : int
+            Indice Python (0-based).
+
+        Returns:
+        str
+            Stringa del tipo 'xxxx' corrispondente.
+        """
+        return f'{index + 1:04}'
         
