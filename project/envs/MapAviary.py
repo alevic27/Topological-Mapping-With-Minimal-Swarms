@@ -869,61 +869,6 @@ class MapAviary(ProjAviary):
         highest_point_id = max(point_ids, key=lambda x: int(x))
         return highest_point_id
 
-    def add_point_old(self,
-                  drone_id,
-                  coords,
-                  point_type):
-        """aggiunge un punto al database del drone selezionato
-        Parameters
-        -------
-        drone_id : int
-            id del drone alla cui lista voglio aggiungere un punto
-        coords : ndarray
-            (3)-shaped array con le coord del punto
-        point_type : string
-            può essere 'corridor', 'juction', 'corner'          
-        """
-        new_point_threshold_distance = 0.7 #TODO: tuning
-        if drone_id not in self.drones_db:
-            self.drones_db[drone_id] = {}
-        min_dist = self.distance_between_newpoint_and_oldpoints(drone_id,coords)
-        if min_dist > new_point_threshold_distance or point_type == 'junction':
-            ### AGGIUNTA NUOVA CHIAVE AL DIZIONARIO self.drones_db ###
-            previous_point_id = self.get_highest_point_id(drone_id)
-            point_id = self.get_next_point_id(drone_id)
-            self.drones_db[drone_id][point_id] = {'coords': coords.copy(), 'type': point_type}
-            print(f'Added point {point_id} to drone {drone_id}')
-            ### aggiunta nuova riga e colonna alla matrice[drone_id]
-            current_matrix = self.adjacency_matrices[drone_id]
-            num_nodes = len(self.drones_db[drone_id])
-# la condizione seguente "if num_nodes > 1:" va ricreata perchè ora self.drones_db perde chiavi e si restringe 
-# il dilemma si può sbrogliare in più modi, al momento il database cancella i vecchi punti e li sosttuisce con id superiori
-# se aggiungo sempre una riga alla matrice nuova
-
-#in più c'è il poblema che fare merge non aggiusta gli edges
-            if num_nodes > 1:  
-                # Creiamo una nuova matrice con una dimensione aumentata di 1
-                new_matrix = np.zeros((num_nodes , num_nodes ), dtype=int)
-                # Copiamo i valori della matrice corrente nella nuova matrice
-                new_matrix[:num_nodes-1, :num_nodes-1] = current_matrix
-                # Aggiorniamo la lista delle matrici di adiacenza
-                self.adjacency_matrices[drone_id] = new_matrix
-            ### AGGIUNTA PALLINO VISIVO ###
-            if point_type == 'corridor':
-                color = [1, 0, 0, 1] # red
-            elif point_type == 'junction':
-                color = [0, 1, 0, 1] # green
-            self.add_visual_ball(drone_id, point_id, coords, color)
-            ### AGGIUNTA EDGE ###
-            # per ora solo tra nuovo punto e vecchio punto #
-            if previous_point_id:
-                self.add_edge(drone_id, previous_point_id, point_id)
-            if self.MERGING:
-                for i in range(self.NUM_DRONES):
-                    self.merge_similar_points_2_drones3(drone_id,i)
-            if self.edges_visualization:
-                self.show_edges()
-
     def add_point(self,
                   drone_id,
                   coords,
@@ -967,7 +912,7 @@ class MapAviary(ProjAviary):
                 self.add_edge(drone_id, previous_point_id, point_id) #TODO questo di strano ha che collega il punto all'ultimo in termini di codice che però potrebbe essere figlio di un merge qualsiasi anche in un'altra parte della mappa
             if self.MERGING:
                 for i in range(self.NUM_DRONES):
-                    self.merge_similar_points_2_drones3(drone_id,i)
+                    self.merge_similar_points_2_drones(drone_id,i)
             if self.edges_visualization:
                 self.show_edges()
 
@@ -989,16 +934,10 @@ class MapAviary(ProjAviary):
         point_key2: str
             key del nodo 2
         """
-        #keys = list(self.drones_db[drone_id].keys())
-        #idx1 = keys.index(point_key1)
-        #idx2 = keys.index(point_key2)
         idx1 = self.point_id_to_index(point_key1)
         idx2 = self.point_id_to_index(point_key2)
         self.adjacency_matrices[drone_id][idx1, idx2] = 1
         self.adjacency_matrices[drone_id][idx2, idx1] = 1
-        #if self.edges_visualization:
-        #    ###mettere l'aggiunta self.add_visual_line
-        #    pass
 
     def euclidean_distance(self,
                            point1,
@@ -1017,76 +956,9 @@ class MapAviary(ProjAviary):
         return np.linalg.norm(np.array(point1) - np.array(point2))
 
     def merge_similar_points_2_drones(self,
-                                      drone1_id,
-                                      drone2_id,
-                                      threshold=1):
-        """ confronto incrociato tra i nodi di 2 droni diversi e sostituisce con la media #TODO: aggiusta sensibilità
-        Parameters
-        -------
-        drone1_id: int 
-        drone2_id: int
-        threshold: float - optional
-        """
-        drone1_points = self.drones_db[drone1_id]
-        drone2_points = self.drones_db[drone2_id]
-        if drone1_id != drone2_id:
-            for point_id_drone1, data1 in drone1_points.items():
-                for point_id_drone2, data2 in drone2_points.items():
-                    if self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
-                        new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist()
-                        new_type = data1['type']
-                        #sostituisco le coordinate medie al posto di quelle del drone 1
-                        self.drones_db[drone1_id][point_id_drone1]['coords'] = new_coords
-                        #rimuovo la palletta
-                        self.remove_visual_ball(drone1_id,point_id_drone1)
-                        #sostituisco le coordinate medie al posto di quelle del drone 1
-                        self.drones_db[drone2_id][point_id_drone2]['coords'] = new_coords
-                        #rimuovo la palletta
-                        self.remove_visual_ball(drone2_id,point_id_drone2)
-                        #aggiungo una sola palletta dandola al primo dei due (
-                        # nota: il secondo avrà una palla a livello di visualizzazione in meno nella lista)
-                        self.add_visual_ball(drone1_id,point_id_drone1,new_coords)
-
-    def merge_similar_points_2_drones2(self,
-                                      drone1_id,
-                                      drone2_id,
-                                      threshold=1):
-        """ confronto incrociato tra i nodi di 2 droni diversi e sostituisce con la media #TODO: aggiusta sensibilità
-        Parameters
-        -------
-        drone1_id: int 
-        drone2_id: int
-        threshold: float - optional
-        """
-        drone1_points = self.drones_db[drone1_id]
-        drone2_points = self.drones_db[drone2_id]
-        if drone1_id != drone2_id:
-            for point_id_drone1, data1 in drone1_points.items():
-                for point_id_drone2, data2 in drone2_points.items():
-                    if self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
-                        new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist()
-                        new_type = data1['type']
-                        #elimino le vecchie istanze e le vecchie palline
-                        del self.drones_db[drone1_id][point_id_drone1]
-                        self.remove_visual_ball(drone1_id, point_id_drone1)
-                        del self.drones_db[drone2_id][point_id_drone2]
-                        self.remove_visual_ball(drone2_id, point_id_drone2)
-                        # genero nuovi point_id
-                        new_point_id_drone1 = self.get_next_point_id(drone1_id)
-                        new_point_id_drone2 = self.get_next_point_id(drone2_id)
-                        # aggiungo i nuovi nodi
-                        self.drones_db[drone1_id][new_point_id_drone1] = {'coords': new_coords, 'type': new_type}
-                        self.drones_db[drone2_id][new_point_id_drone2] = {'coords': new_coords, 'type': new_type}
-                        # aggiungo una sola palletta dandola al primo dei due 
-                        # nota: il secondo avrà una palla a livello di visualizzazione in meno nella lista
-                        self.add_visual_ball(drone1_id, new_point_id_drone1, new_coords)    
-                        #self.add_visual_ball(drone1_id, new_point_id_drone2, new_coords) #uncomment per dare la pallina visiva a entrambi
-                        ####### TODO : MANCA LA PARTE CHE MODIFICA LA ADJACENCY MATRIX ##############
-
-    def merge_similar_points_2_drones3(self,
                                   drone1_id,
                                   drone2_id,
-                                  threshold=0.7):
+                                  threshold=0.6):
         """ confronto incrociato tra i nodi di 2 droni diversi e sostituisce con la media
         Parameters
         -------
@@ -1104,11 +976,11 @@ class MapAviary(ProjAviary):
             to_add_drone2 = []
             to_remove_balls = []
             # Inizializza i contatori per il prossimo point_id
-            next_point_id_drone1 = self.get_next_point_id(drone1_id)
-            next_point_id_drone2 = self.get_next_point_id(drone2_id)
             k = 0
             for point_id_drone1, data1 in drone1_points.items():
                 for point_id_drone2, data2 in drone2_points.items():
+                    next_point_id_drone1 = self.get_next_point_id(drone1_id)
+                    next_point_id_drone2 = self.get_next_point_id(drone2_id)
                     if 0 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
                         new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist()
                         new_type = data1['type']
@@ -1125,8 +997,6 @@ class MapAviary(ProjAviary):
                         to_add_drone1.append((next_point_id_drone1, {'coords': new_coords, 'type': new_type}))
                         to_add_drone2.append((next_point_id_drone2, {'coords': new_coords, 'type': new_type}))
                         # SOSTITUZIONE EDGE NELLA ADJACENCY MATRIX
-                        #self.adjacency_matrices[drone1_id] = np.pad(self.adjacency_matrices[drone1_id], ((0, 1), (0, 1)), mode='constant', constant_values=0)
-                        #self.adjacency_matrices[drone2_id] = np.pad(self.adjacency_matrices[drone2_id], ((0, 1), (0, 1)), mode='constant', constant_values=0)
                         self.adjacency_matrices[drone1_id] = self.replace_node_in_adjacency_matrix(self.adjacency_matrices[drone1_id],point_id_drone1,next_point_id_drone1)
                         self.adjacency_matrices[drone2_id] = self.replace_node_in_adjacency_matrix(self.adjacency_matrices[drone2_id],point_id_drone2,next_point_id_drone2)
                         # in teoria serve un if che se trovo corrispondenza tra il mio 0005 e lo 0004 dell'altro che però 0004 c'è l'ho anche io con le stesse coordinate allora va rimosso anche quello
@@ -1147,8 +1017,6 @@ class MapAviary(ProjAviary):
             for point_id, data in to_add_drone2:
                 self.drones_db[drone2_id][point_id] = data
                 self.add_visual_ball(drone2_id, point_id, np.add(data['coords'],[0,0,0.05])) 
-
-            ####### TODO : MANCA LA PARTE CHE MODIFICA LA ADJACENCY MATRIX ##############
 
     def replace_node_in_adjacency_matrix(self,
                                          adjacency_matrix,
@@ -1359,6 +1227,7 @@ class MapAviary(ProjAviary):
             point_indexes = []
             for i in range(num_points):
                 point_indexes.append(self.point_id_to_index(point_ids[i])) 
+            z=0
             for i in point_indexes:
                 for j in point_indexes:
                     if adjacency_matrix[i][j] == 1:
@@ -1366,7 +1235,10 @@ class MapAviary(ProjAviary):
                         point_b_id = self.index_to_point_id(j)
                         point_a_coords = drone_points[point_a_id]['coords']
                         point_b_coords = drone_points[point_b_id]['coords']
-                        self.add_visual_line(drone_id,point_a_coords, point_b_coords)
+                        self.add_visual_line(drone_id,
+                                             np.add(point_a_coords,[0,0,z*0.05]),
+                                             np.add(point_b_coords,[0,0,z*0.05]))
+
             #for i in range(adjacency_matrix.shape[0]):
             #    for j in range(adjacency_matrix.shape[0]):
             #        if adjacency_matrix[i][j] == 1:
