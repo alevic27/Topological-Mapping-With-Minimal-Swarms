@@ -229,6 +229,12 @@ graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
 graph.add_point(2, [3.1, 2.5, 1.0], 'corridor')
 
 
+# aggiungere edge
+graph.remove_point(2,'0002')
+graph.add_edge(2,'0002','0008')
+print(graph.adjacency_matrices)
+
+
 del graph.drones_db[2]['0012']
 graph.display_drones_db()
 prossimo_id = graph.get_next_point_id(2)
@@ -250,14 +256,5 @@ graph.drones_db[0]['0004'] = {'coords': [1., 1., 1.0], 'type': 'prova'}
 # graph.display_drones_db()
 graph.display_drones_db()
 
-# aggiungere edge
-graph.add_edge(1,'0001','0003')
-print(graph.adjacency_matrices)
-
-min_dist = graph.distance_between_newpoint_and_oldpoints(1, [3.2, 2.5, 1.0])
-print(min_dist,"\n")
 
 
-drone1_points = graph.drones_db[0]
-for point_id , data1 in drone1_points.items():
-    print(point_id)
