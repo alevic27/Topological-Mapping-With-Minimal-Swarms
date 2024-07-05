@@ -473,7 +473,7 @@ class MapAviary(ProjAviary):
                 omega[i] = self._WallFollowingandAlign3(i)  
                 self.state1counter[i][0] += 1
                 if self.S_WF[i][0] == 1: # wallfollowing con muro a destra
-                    if np.abs(rF - self.DIST_WALL_REF) < 3*self.td and np.abs(rR - self.DIST_WALL_REF) < 3*self.td :
+                    if np.abs(rF - self.DIST_WALL_REF) < 5*self.td and np.abs(rR - self.DIST_WALL_REF) < 8*self.td :
                         self._SwitchWFSTATE(i, 0)
                         self.wfstatezero_debugger[i] = [0. , np.inf , 0.]
                         print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo")
@@ -482,7 +482,7 @@ class MapAviary(ProjAviary):
                         print("esco da WFSTATE = 1 e entro in WFSTATE = 2")
                         self.turn_start_yaw[i][0] = 0
                 elif self.S_WF[i][0] == -1: # wallfollowing con muro a sinistra
-                    if np.abs(rF - self.DIST_WALL_REF) < 5*self.td and np.abs(rL - self.DIST_WALL_REF) < 5*self.td :
+                    if np.abs(rF - self.DIST_WALL_REF) < 5*self.td and np.abs(rL - self.DIST_WALL_REF) < 8*self.td :
                         self._SwitchWFSTATE(i, 0)
                         self.wfstatezero_debugger[i] = [0. , np.inf , 0.]
                         print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo")
@@ -507,7 +507,11 @@ class MapAviary(ProjAviary):
                     if self.S_WF[i][0] == 1: # wallfollowing con muro a destra
                         print("la differenza tra il range destro attuale e precedente è:", np.abs(rR - self.prev_rR[i][0]) )
                         print("la tolleranza per passare a 3 è", self.td*0.002)
-                        if self.prev_rR[i][0] != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.001 :
+                        if self.prev_rR[i][0] != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.0015 :
+                             # TODO: tuning coefficiente, numero ideale circa 0.0015, troppo stringente in alcuni casi
+                             # possibili fix:
+                             # migliorare uscita da 2
+                             # modificare la logica e fare 2>>>0 , 0>>>3, 3>>>1
                             self._SwitchWFSTATE(i, 3)
                             print("esco da WFSTATE = 2 e entro in WFSTATE = 3 poichè sono abbastanza allineato col muro")
                         if rR == self.MAX_RANGE:
@@ -515,7 +519,7 @@ class MapAviary(ProjAviary):
                             self.state4counter[i][0] = 0
                     elif self.S_WF[i][0] == -1: # wallfollowing con muro a sinistra
                         print("la differenza tra il range sinistro attuale e precedente è:", np.abs(rL - self.prev_rL[i][0]) )
-                        if self.prev_rL[i][0] != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.001 :
+                        if self.prev_rL[i][0] != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.0015 :
                             self._SwitchWFSTATE(i, 3)
                             print("esco da WFSTATE = 2 e entro in WFSTATE = 3 poichè sono abbastanza allineato col muro")
                         if rL == self.MAX_RANGE:
@@ -546,9 +550,9 @@ class MapAviary(ProjAviary):
                         self.WF_ref_angle[i] = self.rpy[i][2]
                         print("esco da WFSTATE = 3 e entro in WFSTATE = 1 poichè sono alla dist giusta dal muro")
                     elif rL > self.DIST_WALL_REF:
-                        vel[i] = np.dot(  cv , [1. , +1. , 0.] )
+                        vel[i] = np.dot(  cv , [0.7 , +0.7 , 0.] )
                     else:
-                        vel[i] = np.dot(  cv , [1. , -1. , 0.] )
+                        vel[i] = np.dot(  cv , [0.7 , -0.7 , 0.] )
 
         ######################  STATO 4 : FIX PER LA PERDITA DEL RANGE LATERALE  ############################
         ### avvia se durante la curva il drone vede MAXRANGE e "perde" il muro, così lo faccio avanzare un pò dritto
@@ -562,6 +566,10 @@ class MapAviary(ProjAviary):
                 if self.state4counter[i][0] > 20 :
                     self._SwitchWFSTATE(i, 3)
                     print("esco da WFSTATE = 4 e entro in WFSTATE = 3 ")   
+
+        ######################  STATO 5 : COLLISION AVOIDANCE  ############################
+            elif self.WFSTATE[i][0] == 5: 
+                pass
 
             print("vel=", vel[i])
             print("omega=", omega[i][0]) 
@@ -594,94 +602,6 @@ class MapAviary(ProjAviary):
             if new_WFSTATE == 0 or new_WFSTATE == 3 or new_WFSTATE == 4:
                 self.add_point(nth_drone,self.pos[nth_drone],'junction')    
 
-
-    def _WallFollowingandAlign(self , nth_drone):    #ALG B.2  versione con solo il sensore davanti, credo necessiti di un meccanismo di memoria
-        """funzione per seguire il muro -> mi da la omega mentre sto navigando vicino al muro per evitare di allontanarmi dal muro
-        Returns
-        --------
-        omega: tipo
-            descrizione
-        vel: tipo
-            descrizione
-        WFstate: int
-            aggiorna il WFstate
-        """
-        outside_region_omega_reduction_factor = 1 # buono:1.5 ## prova 2
-        inside_region_omega_reduction_factor = 0.8 # buono:0.4 ## TODO: aggiusta per far sì che raggiunga un'andamento bello parallelo al muro ASAP
-        if np.abs(self.DIST_WALL_REF-self.distance[nth_drone][1]) > self.td : # sono fuori dalla regione accettabile ( o troppo lontano (distance > dist_wall_ref)) o troppo vicino  (distance < dist_wall_ref)
-            if self.distance[nth_drone][1] > self.DIST_WALL_REF:     # troppo lontano dal muro
-                omega = ([-self.S_WF[nth_drone][0]*self.C_OMEGA*outside_region_omega_reduction_factor])        # TODO check sign : CHECKED -
-                print("sono fuori dalla regione e troppo lontano dal muro")
-            else :                                                # troppo vicino al muro
-                omega = ([+self.S_WF[nth_drone][0]*self.C_OMEGA*outside_region_omega_reduction_factor])  # +
-                print("sono fuori dalla regione e troppo vicino al muro")       
-        elif np.abs(self.DIST_WALL_REF-self.distance[nth_drone][1]) < self.td : #sono dentro alla regione accettabile
-            # meccanismo di fine tune alignment basato su confronto con distance[iesimo drone][0]
-            if self.distance[nth_drone][0] > self.distance[nth_drone][1]: # se la distanza dal muro prima era maggiore (mi sto avvicinando)
-                omega = ([+self.S_WF[nth_drone][0]*self.C_OMEGA*inside_region_omega_reduction_factor])     # TODO andiamo a culo vedi se cambiare
-                #omega = ([0.])
-                print("sono dentro alla regione e mi sto avvicinando al muro")
-            else : 
-                omega = ([-self.S_WF[nth_drone][0]*self.C_OMEGA*inside_region_omega_reduction_factor])
-                #omega = ([0.])
-                print("sono dentro alla regione e mi sto allontanando dal muro")
-              
-        else :
-            omega = ([0.])
-        return omega      
-    
-    ################################################################################
-
-    def _WallFollowingandAlign2(self , nth_drone):    #ALG B.2  versione con solo il sensore davanti, credo necessiti di un meccanismo di memoria
-        """funzione per seguire il muro -> mi da la omega mentre sto navigando vicino al muro per evitare di allontanarmi dal muro
-        Rifatta per usare le distanze laterali
-        Sfrutta anche self.WF_ref_angle[i] angolo di partenza del WF
-        Returns
-        --------
-        omega: tipo
-            descrizione
-        vel: tipo
-            descrizione
-        WFstate: int
-            aggiorna il WFstate
-        """
-        outside_region_omega_reduction_factor = 1 # buono:1.5 ## prova 2
-        inside_region_omega_reduction_factor = 0.6 # buono:0.4 ## TODO: aggiusta per far sì che raggiunga un'andamento bello parallelo al muro ASAP
-        
-        alfa = self.rpy[nth_drone][2] - self.WF_ref_angle[nth_drone]  # pos se sbando verso sinsitra
-                                                                      # neg se sbando verso destra
-        print('alfa =' , alfa)
-        if self.S_WF[nth_drone][0] == 1: # wallfollowing con muro a destra
-            lat_distance = self.observation[nth_drone][3] # distanza destra
-            #lat_distance = lat_distance * np.cos(alfa)
-            prev_lat_distance = self.prev_rR[nth_drone][0]
-        elif self.S_WF[nth_drone][0] == -1: # wallfollowing con muro a sinistra
-            lat_distance = self.observation[nth_drone][1] # distanza sinistra
-            #lat_distance = lat_distance * np.cos(alfa)
-            prev_lat_distance = self.prev_rL[nth_drone][0]
-            
-        if np.abs(self.DIST_WALL_REF-lat_distance) > self.td : # sono fuori dalla regione accettabile ( o troppo lontano (distance > dist_wall_ref)) o troppo vicino  (distance < dist_wall_ref)
-            if lat_distance > self.DIST_WALL_REF : #and self.rpy[nth_drone][2] < self.WF_ref_angle[nth_drone]:     # troppo lontano dal muro
-                omega = ([-self.S_WF[nth_drone][0]*self.C_OMEGA*outside_region_omega_reduction_factor])        # TODO check sign : CHECKED -
-                print("sono fuori dalla regione e troppo lontano dal muro")
-            elif lat_distance < self.DIST_WALL_REF:                                                # troppo vicino al muro
-                omega = ([+self.S_WF[nth_drone][0]*self.C_OMEGA*outside_region_omega_reduction_factor])  # +
-                print("sono fuori dalla regione e troppo vicino al muro")       
-        elif np.abs(self.DIST_WALL_REF-lat_distance) <  self.td : #sono dentro alla regione accettabile
-            # meccanismo di fine tune alignment basato su confronto con distance[iesimo drone][0]
-            if prev_lat_distance > lat_distance: # se la distanza dal muro prima era maggiore (mi sto avvicinando)
-                omega = ([+self.S_WF[nth_drone][0]*self.C_OMEGA*inside_region_omega_reduction_factor])     # TODO andiamo a culo vedi se cambiare
-                #omega = ([0.])
-                print("sono dentro alla regione e mi sto avvicinando al muro")
-            else : 
-                omega = ([-self.S_WF[nth_drone][0]*self.C_OMEGA*inside_region_omega_reduction_factor])
-                #omega = ([0.])
-                print("sono dentro alla regione e mi sto allontanando dal muro")
-              
-        else :
-            omega = ([0.])
-        return omega      
-    
     ################################################################################
 
     def _WallFollowingandAlign3(self , nth_drone):    #ALG B.2  versione con solo il sensore davanti, credo necessiti di un meccanismo di memoria
@@ -697,8 +617,8 @@ class MapAviary(ProjAviary):
         WFstate: int
             aggiorna il WFstate
         """
-        outside_region_omega_reduction_factor = 1 # buono:1.5 ## prova 2
-        inside_region_omega_reduction_factor = 0.6 # buono:0.4 ## TODO: aggiusta per far sì che raggiunga un'andamento bello parallelo al muro ASAP
+        outside_region_omega_reduction_factor = 1 # buono:1.5 ## TODO : tuning 
+        inside_region_omega_reduction_factor = 0.6 # buono:0.4 ## TODO: tuning
         
         alfa = self.rpy[nth_drone][2] - self.WF_ref_angle[nth_drone]  # pos se sbando verso sinistra
                                                                       # neg se sbando verso destra
@@ -883,7 +803,7 @@ class MapAviary(ProjAviary):
         point_type : string
             può essere 'corridor', 'juction', 'corner'          
         """
-        new_point_threshold_distance = 0.7 #TODO: tuning
+        new_point_threshold_distance = 0.7 #TODO: tuning, perchè si rischia che dopo un giro non aggiunge più niente perchè ha messo qualcosa
         if drone_id not in self.drones_db:
             self.drones_db[drone_id] = {}
         min_dist = self.distance_between_newpoint_and_oldpoints(drone_id,coords)
@@ -969,7 +889,7 @@ class MapAviary(ProjAviary):
         drone1_points = self.drones_db[drone1_id]
         drone2_points = self.drones_db[drone2_id]
 
-        if drone1_id != drone2_id:
+        if drone1_id != drone2_id: # se tolta i droni mergiano anche con sè stessi
             to_remove_drone1 = []
             to_remove_drone2 = []
             to_add_drone1 = []

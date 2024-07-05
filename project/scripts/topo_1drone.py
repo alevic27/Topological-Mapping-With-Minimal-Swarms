@@ -42,7 +42,7 @@ DEFAULT_CONTROL_VELOCITY: float = 0.2  #works with 0.2
 DEFAULT_WFSTATE : int = -1
 DEFAULT_THRESHOLD_DISTANCE : float = 0.03
 
-DEFAULT_MERGING_GRAPHS_LOGIC = False
+DEFAULT_MERGING_GRAPHS_LOGIC = False # True fa runnare il codice che fa il merge dei nodi dei diversi droni. False per analizzare il solo volo
 DEFAULT_EDGES_VISUALIZATION = True
 
 def run(
