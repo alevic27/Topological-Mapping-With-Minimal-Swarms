@@ -36,6 +36,7 @@ class MapAviary(ProjAviary):
                  td : float = 0.02,
                  merging_graphs=False,
                  edges_visualization=False,
+                 self_merge=False,
                  ):
         
         """Initialization of an environment with drones capable of performing topological mapping.
@@ -124,6 +125,7 @@ class MapAviary(ProjAviary):
         self.custom_id_balls_map = {}
         self.MERGING = merging_graphs
         self.edges_visualization = edges_visualization
+        self.SELFMERGE = self_merge
     ################################################################################
 
     def NextWP(self,obs,observation): #Aggiungere gli input necessari
@@ -895,7 +897,7 @@ class MapAviary(ProjAviary):
         """
         drone1_points = self.drones_db[drone1_id]
         drone2_points = self.drones_db[drone2_id]
-
+         
         if drone1_id != drone2_id: # se tolta i droni mergiano anche con sè stessi
             to_remove_drone1 = []
             to_remove_drone2 = []
@@ -944,6 +946,47 @@ class MapAviary(ProjAviary):
             for point_id, data in to_add_drone2:
                 self.drones_db[drone2_id][point_id] = data
                 self.add_visual_ball(drone2_id, point_id, np.add(data['coords'],[0,0,0.05])) 
+
+        elif drone1_id == drone2_id and self.SELFMERGE == True:
+            to_remove = []
+            to_add = []
+            to_remove_balls = []
+            # Inizializza i contatori per il prossimo point_id
+            k = 0
+            seen_coords = set()
+            for point_id1, data1 in drone1_points.items():
+                for point_id2, data2 in drone2_points.items():
+                    next_point_id_drone1 = self.get_next_point_id(drone1_id)
+                    if point_id1 != point_id2 and 0 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
+                        new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist()
+                        new_coords_tuple = tuple(np.mean([data1['coords'], data2['coords']], axis=0).tolist())
+                        new_type = data1['type']
+                        if new_coords_tuple not in seen_coords:
+                            # Accumula le chiavi da rimuovere
+                            to_remove.append(point_id1)
+                            to_remove.append(point_id2)
+                            to_remove_balls.append((drone1_id, point_id1))
+                            to_remove_balls.append((drone2_id, point_id2))
+                            # Incrementa i contatori
+                            next_point_id_drone1 = self.increment_point_id(next_point_id_drone1,k)
+                            k+=1
+                            # Accumula le chiavi con i rispettivi valori da aggiungere
+                            to_add.append((next_point_id_drone1, {'coords': new_coords, 'type': new_type}))
+                            # SOSTITUZIONE EDGE NELLA ADJACENCY MATRIX
+                            self.adjacency_matrices[drone1_id] = self.replace_node_in_adjacency_matrix(self.adjacency_matrices[drone1_id],point_id1,next_point_id_drone1)
+                            seen_coords.add(new_coords_tuple)
+
+            # Rimuovi le vecchie istanze e le vecchie palline
+            to_remove = set(to_remove) #evita ripetizioni
+            for point_id in to_remove:
+                del self.drones_db[drone1_id][point_id]
+            for drone_id, point_id in to_remove_balls:
+                self.remove_visual_ball(drone_id, point_id)
+        
+            # Aggiungi i nuovi nodi e visualizzazioni
+            for point_id, data in to_add:
+                self.drones_db[drone1_id][point_id] = data
+                self.add_visual_ball(drone1_id, point_id, data['coords'])
 
     def replace_node_in_adjacency_matrix(self,
                                          adjacency_matrix,
