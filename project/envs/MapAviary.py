@@ -152,14 +152,17 @@ class MapAviary(ProjAviary):
             ABSOLUTE_FRAME_VEL = np.dot(RELATIVE_FRAME_VEL[i], rot_mat.T )
             if self.WFSTATE[i] == 5:
                 if self.memory_position[i][2] == 0:
-                    self.memory_position[i] = obs[i][0:10]
-                TARGET_POS[i][0] =  self.memory_position[i][0] 
+                    self.memory_position[i][0:3] = obs[i][0:3]
+                    self.memory_position[i][3:6] = obs[i][7:10]
+                RELATIVE_FRAME_DIRECTION = [0. , 1. , 1. ]
+                ABSOLUTE_FRAME_DIRECTION = np.dot(RELATIVE_FRAME_DIRECTION, rot_mat.T )    
+                TARGET_POS[i][0] =  self.memory_position[i][0] + 0.2* ABSOLUTE_FRAME_DIRECTION[0]
                 if self.S_WF[i] == 1 :
-                    TARGET_POS[i][1] =  self.memory_position[i][1] - 0.2
+                    TARGET_POS[i][1] =  self.memory_position[i][1] - 0.2 * ABSOLUTE_FRAME_DIRECTION[1]
                 else :
-                    TARGET_POS[i][1] =  self.memory_position[i][1] + 0.2
+                    TARGET_POS[i][1] =  self.memory_position[i][1] + 0.2 *ABSOLUTE_FRAME_DIRECTION[1]
 
-                TARGET_POS[i][2] =  self.memory_position[i][2] +0.2
+                TARGET_POS[i][2] =  self.memory_position[i][2] + 0.2 * ABSOLUTE_FRAME_DIRECTION[2]
 
                 TARGET_RPY[i][0] = self.memory_position[i][3]
                 TARGET_RPY[i][1] = self.memory_position[i][4]   
@@ -420,7 +423,7 @@ class MapAviary(ProjAviary):
         cv = self.C_VEL     
         omega = np.array([[0.] for j in range(self.NUM_DRONES)])
         vel = np.array([[0. , 0. , 0.] for j in range(self.NUM_DRONES)])
-        state_2_omega_coeff = 0.95  # <1 per allargare il raggio di curvatura del WFSTATE = 2
+        state_2_omega_coeff = 1  # <1 per allargare il raggio di curvatura del WFSTATE = 2
         time_step  = 1 / self.CTRL_FREQ
         
         for i in range(self.NUM_DRONES) :
@@ -610,7 +613,7 @@ class MapAviary(ProjAviary):
                     vel [i] = np.dot(  cv , [0, 0 , 0] )
                     omega[i] = ([0]) 
                     self.state6counter[i][0] += 1
-                    if self.state6counter[i][0] > 50 and len(collision) == 0:
+                    if self.state6counter[i][0] > 100 and len(collision) == 0:
                         self.state6counter[i][0] = 0 
                         self._SwitchWFSTATE(i, 6)
         ######################  STATO 6 : USCITA DAL COLLISION AVOIDANCE  ############################
@@ -633,7 +636,7 @@ class MapAviary(ProjAviary):
             #self.WFSTATE[i] = 0
             #omega[i] = ([0.5])
             #vel [i] = ([0.2])            
-        return omega , vel , self.WFSTATE
+        return omega , vel , self.WFSTATE, self.S_WF 
     
     ################################################################################
     
@@ -795,7 +798,7 @@ class MapAviary(ProjAviary):
         della posizione di tutti i droni. La collisione si intende sempre tra un drone che presenta un id maggiore rispetto ad
         uno con id inferiore
         """
-        collision_treshold = 0.1
+        collision_treshold = 0.2
         drones_position = np.array([self._getDroneStateVector(j)[0:3] for j  in range(self.NUM_DRONES)])
         drones_distance =  np.array([[np.inf] for j in range(self.NUM_DRONES)] )
         collision =  np.array([[0] for j in range(self.NUM_DRONES)] )
