@@ -36,6 +36,7 @@ class MapAviary(ProjAviary):
                  td : float = 0.02,
                  merging_graphs=False,
                  edges_visualization=False,
+                 self_merge=False,
                  ):
         
         """Initialization of an environment with drones capable of performing topological mapping.
@@ -118,7 +119,6 @@ class MapAviary(ProjAviary):
         self.state6counter = np.array([[0] for j in range(self.NUM_DRONES)] )
         self.td = td ## threshold distance to determine wether the drone is almost at reference distance from wall
         self.IM_IN_A_CORNER = np.array([[False] for j in range(self.NUM_DRONES)] )
-        self.I_EXIT_FROM_A_TURN= np.array([[False] for j in range(self.NUM_DRONES)] )
         self.WF_ref_angle = np.array([[0.] for j in range(self.NUM_DRONES)] ) # yaw di riferimento di start dello stato 1 per non allontanarsi troppo dalla direzione parallela
         self.memory_state = np.array([[np.inf] for j in range(self.NUM_DRONES)] ) # memory dello stato in cui ci strova prima di una collision
         self.memory_position = np.array([[0. , 0. ,0. , 0. ,0. ,0.] for j in range(self.NUM_DRONES)] )
@@ -128,6 +128,7 @@ class MapAviary(ProjAviary):
         self.custom_id_balls_map = {}
         self.MERGING = merging_graphs
         self.edges_visualization = edges_visualization
+        self.SELFMERGE = self_merge
     ################################################################################
 
     def NextWP(self,obs,observation): #Aggiungere gli input necessari
@@ -328,7 +329,7 @@ class MapAviary(ProjAviary):
                         self.wfstatezero_debugger[i] = [0. , np.inf , 0.]
                         print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo")
                     #if rR > self.DIST_WALL_REF + 5*self.td:
-                    if np.abs(self.prev_rR[i][0] - rR) > 1*self.td  : #condizione con la storia di rR
+                    if np.abs(self.prev_rR[i][0] - rR) > 1*self.td: #condizione con la storia di rR
                         self.WFSTATE[i] = 2 #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
                         print("esco da WFSTATE = 1 e entro in WFSTATE = 2")
                         self.turn_start_yaw[i][0] = 0
@@ -424,7 +425,7 @@ class MapAviary(ProjAviary):
         cv = self.C_VEL     
         omega = np.array([[0.] for j in range(self.NUM_DRONES)])
         vel = np.array([[0. , 0. , 0.] for j in range(self.NUM_DRONES)])
-        state_2_omega_coeff = 0.95 # <1 per allargare il raggio di curvatura del WFSTATE = 2
+        state_2_omega_coeff = 0.95  # <1 per allargare il raggio di curvatura del WFSTATE = 2
         time_step  = 1 / self.CTRL_FREQ
         
         for i in range(self.NUM_DRONES) :
@@ -440,7 +441,8 @@ class MapAviary(ProjAviary):
             if len(superiors) != 0 and self.WFSTATE[i] != 5 and self.WFSTATE[i] != 6:
                 self.memory_state[i] =  self.WFSTATE[i]
                 self.WFSTATE[i] = 5
-                
+            # len(inferiors) è il numero di droni a cui devo dare precedenza
+            # len(superiors) è il numero di droni su cui ho precedenza
 
         ######################  STATO 0 : GIRO SUL POSTO PER ALLINEARSI AL MURO  ############################
         ### note: l'uscita da un angolo convesso è funzionante solo a DISTWALLREF dal muro
@@ -452,8 +454,8 @@ class MapAviary(ProjAviary):
                 if self.S_WF[i][0] == 1: # wallfollowing con muro a destra
                     print("differenza tra range destro e range destro precedente: ",np.abs(rR - self.prev_rR[i][0]))
                     if self.IM_IN_A_CORNER[i][0] == True:
-                        if np.abs(rB - self.DIST_WALL_REF) < 9*self.td and np.abs(rR - self.DIST_WALL_REF) < 6*self.td: # se dietro e destra so circa ar top
-                            if rR != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.05 : # TODO: aggiusta sensibilità
+                        if np.abs(rB - self.DIST_WALL_REF) < 8*self.td and np.abs(rR - self.DIST_WALL_REF) < 5*self.td: #and np.abs(rF - self.DIST_WALL_REF) > 10*self.td: # se dietro e destra so circa ar top
+                            if rR != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.03 : # TODO: aggiusta sensibilità
                                 self._SwitchWFSTATE(i, 1)
                                 self.state1counter[i][0] = 0
                                 self.WF_ref_angle[i] = self.rpy[i][2]
@@ -464,8 +466,8 @@ class MapAviary(ProjAviary):
                 elif self.S_WF[i][0] == -1: # wallfollowing con muro a sinistra                    
                     print("differenza tra range sinistro e range sinistro precedente: ",np.abs(rL - self.prev_rL[i][0]))
                     if self.IM_IN_A_CORNER[i][0] == True:
-                        if np.abs(rB - self.DIST_WALL_REF) < 9*self.td and np.abs(rL - self.DIST_WALL_REF) < 6*self.td: # se dietro e sinistra so circa ar top
-                            if rL != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.05 : # TODO: aggiusta sensibilità
+                        if np.abs(rB - self.DIST_WALL_REF) < 8*self.td and np.abs(rL - self.DIST_WALL_REF) < 5*self.td: #and np.abs(rF - self.DIST_WALL_REF) > 10*self.td: # se dietro e sinistra so circa ar top
+                            if rL != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.03 : # TODO: aggiusta sensibilità
                                 self._SwitchWFSTATE(i, 1)
                                 self.state1counter[i][0] = 0
                                 self.WF_ref_angle[i] = self.rpy[i][2]
@@ -516,15 +518,13 @@ class MapAviary(ProjAviary):
                 vel [i] = np.dot(  cv , [1. , 0. , 0.] ) 
                 omega[i] = self._WallFollowingandAlign3(i)  
                 self.state1counter[i][0] += 1
-                print(self.state1counter[i][0])
-                
-                if len(inferiors)==0:
+                if len(inferiors)==0: # len(inferiors) == posso uscire da 1 solo se nessuno mi sta dando priorità
                     if self.S_WF[i][0] == 1: # wallfollowing con muro a destra
                         if np.abs(rF - self.DIST_WALL_REF) < 5*self.td and np.abs(rR - self.DIST_WALL_REF) < 8*self.td :
                             self._SwitchWFSTATE(i, 0)
                             self.wfstatezero_debugger[i] = [0. , np.inf , 0.]
                             print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo")
-                        if np.abs(self.prev_rR[i][0] - rR) > 1.5*self.td and self.I_EXIT_FROM_A_TURN[i][0]== False: #condizione con la storia di rR
+                        if np.abs(self.prev_rR[i][0] - rR) > 1.2*self.td: #condizione con la storia di rR
                             self._SwitchWFSTATE(i, 2) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
                             print("esco da WFSTATE = 1 e entro in WFSTATE = 2")
                             self.turn_start_yaw[i][0] = 0
@@ -533,18 +533,14 @@ class MapAviary(ProjAviary):
                             self._SwitchWFSTATE(i, 0)
                             self.wfstatezero_debugger[i] = [0. , np.inf , 0.]
                             print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo")
-                        if np.abs(self.prev_rL[i][0] - rL) > 1.5*self.td and self.I_EXIT_FROM_A_TURN[i][0]== False: #condizione con la storia di rR
+                        if np.abs(self.prev_rL[i][0] - rL) > 1.2*self.td: #condizione con la storia di rR
                             self._SwitchWFSTATE(i, 2) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
                             print("esco da WFSTATE = 1 e entro in WFSTATE = 2")
                             self.turn_start_yaw[i][0] = 0
                 ###### Topological
                 if self.state1counter[i][0] == 100:
                     self.add_point(i,self.pos[i],'corridor')
-                    self.I_EXIT_FROM_A_TURN[i][0] = False
                     self.state1counter[i][0] = 0
-                    
-                    
-
                         
         ######################  STATO 2 : CURVA  ############################
         ### possibili migliorie: - rimuovere la cosa che dopo va in 3 e farlo andare in 0
@@ -563,9 +559,9 @@ class MapAviary(ProjAviary):
                              # possibili fix:
                              # migliorare uscita da 2
                              # modificare la logica e fare 2>>>0 , 0>>>3, 3>>>1
-                            self._SwitchWFSTATE(i, 3)
+                            self._SwitchWFSTATE(i, 4)
                             self.WF_ref_angle[i] = self.rpy[i][2]
-                            print("esco da WFSTATE = 2 e entro in WFSTATE = 3 poichè sono abbastanza allineato col muro")
+                            print("esco da WFSTATE = 2 e entro in WFSTATE = 4 poichè sono abbastanza allineato col muro")
                         if np.abs(rR - self.prev_rR[i][0]) > 0.5 or rR == self.MAX_RANGE:
                             self._SwitchWFSTATE(i, 4)
                             self.WF_ref_angle[i] = self.rpy[i][2]
@@ -573,9 +569,9 @@ class MapAviary(ProjAviary):
                     elif self.S_WF[i][0] == -1: # wallfollowing con muro a sinistra
                         print("la differenza tra il range sinistro attuale e precedente è:", np.abs(rL - self.prev_rL[i][0]) )
                         if self.prev_rL[i][0] != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.003 : # 0.0015 era bono
-                            self._SwitchWFSTATE(i, 3)
+                            self._SwitchWFSTATE(i, 4)
                             self.WF_ref_angle[i] = self.rpy[i][2]
-                            print("esco da WFSTATE = 2 e entro in WFSTATE = 3 poichè sono abbastanza allineato col muro")
+                            print("esco da WFSTATE = 2 e entro in WFSTATE = 4 poichè sono abbastanza allineato col muro")
                         if np.abs(rL - self.prev_rL[i][0]) > 0.5 or rL == self.MAX_RANGE:
                             self._SwitchWFSTATE(i, 4)
                             self.WF_ref_angle[i] = self.rpy[i][2]
@@ -594,10 +590,6 @@ class MapAviary(ProjAviary):
                         self.state1counter[i][0] = 0
                         #self.WF_ref_angle[i] = self.rpy[i][2]
                         print("esco da WFSTATE = 3 e entro in WFSTATE = 1 poichè sono alla dist giusta dal muro")
-                    elif np.abs(rR - self.prev_rL[i][0]) > 0.5 or rR == self.MAX_RANGE:
-                         self._SwitchWFSTATE(i, 4)
-                         self.WF_ref_angle[i] = self.rpy[i][2]
-                         self.state4counter[i][0] = 0
                     elif rR > self.DIST_WALL_REF:
                         vel[i] = np.dot(  cv , [0.7 , -0.7 , 0.] )
                     else:
@@ -608,11 +600,7 @@ class MapAviary(ProjAviary):
                         self.state1counter[i][0] = 0
                         #self.WF_ref_angle[i] = self.rpy[i][2]
                         print("esco da WFSTATE = 3 e entro in WFSTATE = 1 poichè sono alla dist giusta dal muro")
-                    elif np.abs(rL - self.prev_rL[i][0]) > 0.5 or rL == self.MAX_RANGE:
-                         self._SwitchWFSTATE(i, 4)
-                         self.WF_ref_angle[i] = self.rpy[i][2]
-                         self.state4counter[i][0] = 0
-                    elif rL > self.DIST_WALL_REF :
+                    elif rL > self.DIST_WALL_REF:
                         vel[i] = np.dot(  cv , [0.7 , +0.7 , 0.] )
                     else:
                         vel[i] = np.dot(  cv , [0.7 , -0.7 , 0.] )
@@ -626,8 +614,7 @@ class MapAviary(ProjAviary):
                 omega[i] = ([0]) 
                 self.state4counter[i][0] += 1
                 print(self.state4counter[i][0])
-                # if self.state4counter[i][0] > 20 :
-                if rL - self.prev_rL[i][0] < 0.5 and rL != self.MAX_RANGE :
+                if self.state4counter[i][0] > 20 :
                     self._SwitchWFSTATE(i, 3)
                     print("esco da WFSTATE = 4 e entro in WFSTATE = 3 ")   
 
@@ -674,7 +661,7 @@ class MapAviary(ProjAviary):
         old_WFSTATE = self.WFSTATE[nth_drone][0]  # might use to print stuff
         self.WFSTATE[nth_drone][0] = new_WFSTATE
         print(old_WFSTATE, ">>", new_WFSTATE)
-        if new_WFSTATE == 1:
+        if old_WFSTATE != 0 and new_WFSTATE == 1:
             self.add_point(nth_drone,self.pos[nth_drone],'corridor')
         if old_WFSTATE == 1 and new_WFSTATE == 2: # inizio curva
             self.add_point(nth_drone,self.pos[nth_drone],'junction')
@@ -685,11 +672,9 @@ class MapAviary(ProjAviary):
         if old_WFSTATE == 1 and new_WFSTATE == 0: # 
             self.IM_IN_A_CORNER[nth_drone][0] = True
         if old_WFSTATE == 0 and new_WFSTATE == 1:
+            if self.IM_IN_A_CORNER[nth_drone][0] == True:
+                self.add_point(nth_drone,self.pos[nth_drone],'corner')
             self.IM_IN_A_CORNER[nth_drone][0] = False
-        if old_WFSTATE == 3 and new_WFSTATE == 1 :
-            self.I_EXIT_FROM_A_TURN[nth_drone][0] = True
-        else:
-            self.I_EXIT_FROM_A_TURN[nth_drone][0] = False
 
 
     ################################################################################
@@ -824,17 +809,18 @@ class MapAviary(ProjAviary):
     def find_collision(self,nth_drone):
         """
         Gestisce la logica di identificazione di un ostacolo in movimento nelle vicinanze. Si basa sulla conoscenza a priori
-        della posizione di tutti i droni. La collisione si intende sempre tra un drone che presenta un id maggiore rispetto ad
-        uno con id inferiore
+        della posizione di tutti i droni. 
+
         Returns
+        -------
         collision : ndarray
             (NUM_DRONES, 1)  
             l'iesimo valore è 
-            0 se quel drone non lo vedo
-            1 se vedo quel drone e ho precedenza
-            2 se vedo quel drone e gli devo lasciare precedenza
+            0 se quel drone non lo vedo ;
+            1 se vedo quel drone e ha id maggiore del mi ;
+            2 se vedo quel drone e ha id minore del mio (gli devo lasciare precedenza)
         """
-        collision_treshold = 1.5*self.DIST_WALL_REF
+        collision_treshold = 30*self.td
         drones_position = np.array([self._getDroneStateVector(j)[0:3] for j  in range(self.NUM_DRONES)])
         drones_distance =  np.array([[np.inf] for j in range(self.NUM_DRONES)] )
         collision =  np.array([[0] for j in range(self.NUM_DRONES)] )
@@ -908,6 +894,26 @@ class MapAviary(ProjAviary):
         highest_point_id = max(point_ids, key=lambda x: int(x))
         return highest_point_id
 
+    def get_last_added_point_id(self, drone_id):
+        """
+        Restituisce l'ID dell'unico punto che ha nella chiave 'addition' il valore 'last'
+        Poi sostituisce 'last' con 'previous'
+        Parameters
+        ----------
+        drone_id : int
+            ID del drone di cui vogliamo trovare l'ultimo punto aggiunto.
+
+        Returns
+        -------
+        str
+            L'ID del punto con il valore 'last'.
+        """
+        for point_id, data in self.drones_db[drone_id].items():
+            if data['addition'] == 'last':
+                self.drones_db[drone_id][point_id]['addition'] = 'previous'
+                return point_id
+        return None  # Nel caso in cui non ci sia nessun punto con il valore 'last'
+
     def add_point(self,
                   drone_id,
                   coords,
@@ -920,17 +926,23 @@ class MapAviary(ProjAviary):
         coords : ndarray
             (3)-shaped array con le coord del punto
         point_type : string
-            può essere 'corridor', 'juction', 'corner'          
+            può essere 'corridor', 'juction', 'corner'
+        addition : string
+            può essere 'previous', 'last' , 'new'
+            'previous': tutti i nodi precedenti
+            'last' : il nodo creato per ultimo camminando e non mergiando
+            'new' : il nodo creato a questo step
         """
         new_point_threshold_distance = 0.7 #TODO: tuning, perchè si rischia che dopo un giro non aggiunge più niente perchè ha messo qualcosa
         if drone_id not in self.drones_db:
             self.drones_db[drone_id] = {}
         min_dist = self.distance_between_newpoint_and_oldpoints(drone_id,coords)
-        if min_dist > new_point_threshold_distance or point_type == 'junction':
+        if min_dist > new_point_threshold_distance or point_type == 'junction' or point_type == 'corner':
             ### AGGIUNTA NUOVA CHIAVE AL DIZIONARIO self.drones_db ###
             previous_point_id = self.get_highest_point_id(drone_id)
+            last_added_point = self.get_last_added_point_id(drone_id)
             point_id = self.get_next_point_id(drone_id)
-            self.drones_db[drone_id][point_id] = {'coords': coords.copy(), 'type': point_type}
+            self.drones_db[drone_id][point_id] = {'coords': coords.copy(), 'type': point_type, 'addition': 'last'}
             print(f'Added point {point_id} to drone {drone_id}')
             ### AGGIUNTA NUOVA RIGA E COLONNA alla adjacencymatrix[drone_id]
             current_matrix = self.adjacency_matrices[drone_id]
@@ -940,15 +952,11 @@ class MapAviary(ProjAviary):
             #highest_index = self.point_id_to_index(highest_id)  #  '0002' >>> 1
             self.adjacency_matrices[drone_id] = new_matrix    
             ### AGGIUNTA PALLINO VISIVO ###
-            if point_type == 'corridor':
-                color = [1, 0, 0, 1] # red
-            elif point_type == 'junction':
-                color = [0, 1, 0, 1] # green
-            self.add_visual_ball(drone_id, point_id, coords, color)
+            self.add_visual_ball(drone_id, point_id, coords)
             ### AGGIUNTA EDGE ###
             # per ora solo tra nuovo punto e vecchio punto #
-            if previous_point_id:
-                self.add_edge(drone_id, previous_point_id, point_id) #TODO questo di strano ha che collega il punto all'ultimo in termini di codice che però potrebbe essere figlio di un merge qualsiasi anche in un'altra parte della mappa
+            if last_added_point:
+                self.add_edge(drone_id, last_added_point, point_id) #TODO questo di strano ha che collega il punto all'ultimo in termini di codice che però potrebbe essere figlio di un merge qualsiasi anche in un'altra parte della mappa
             if self.MERGING:
                 for i in range(self.NUM_DRONES):
                     self.merge_similar_points_2_drones(drone_id,i)
@@ -1007,7 +1015,7 @@ class MapAviary(ProjAviary):
         """
         drone1_points = self.drones_db[drone1_id]
         drone2_points = self.drones_db[drone2_id]
-
+         
         if drone1_id != drone2_id: # se tolta i droni mergiano anche con sè stessi
             to_remove_drone1 = []
             to_remove_drone2 = []
@@ -1033,8 +1041,16 @@ class MapAviary(ProjAviary):
                         next_point_id_drone2 = self.increment_point_id(next_point_id_drone2,k)
                         k+=1
                         # Accumula le chiavi con i rispettivi valori da aggiungere
-                        to_add_drone1.append((next_point_id_drone1, {'coords': new_coords, 'type': new_type}))
-                        to_add_drone2.append((next_point_id_drone2, {'coords': new_coords, 'type': new_type}))
+                        if data1['addition'] == 'last':
+                            addition_type1 = 'last'
+                        else:
+                            addition_type1 = 'previous' 
+                        if data2['addition'] == 'last':
+                            addition_type2 = 'last'
+                        else:
+                            addition_type2 = 'previous'     
+                        to_add_drone1.append((next_point_id_drone1, {'coords': new_coords, 'type': new_type, 'addition': addition_type1}))
+                        to_add_drone2.append((next_point_id_drone2, {'coords': new_coords, 'type': new_type, 'addition': addition_type2}))
                         # SOSTITUZIONE EDGE NELLA ADJACENCY MATRIX
                         self.adjacency_matrices[drone1_id] = self.replace_node_in_adjacency_matrix(self.adjacency_matrices[drone1_id],point_id_drone1,next_point_id_drone1)
                         self.adjacency_matrices[drone2_id] = self.replace_node_in_adjacency_matrix(self.adjacency_matrices[drone2_id],point_id_drone2,next_point_id_drone2)
@@ -1056,6 +1072,55 @@ class MapAviary(ProjAviary):
             for point_id, data in to_add_drone2:
                 self.drones_db[drone2_id][point_id] = data
                 self.add_visual_ball(drone2_id, point_id, np.add(data['coords'],[0,0,0.05])) 
+
+        elif drone1_id == drone2_id and self.SELFMERGE == True:
+            to_remove = []
+            to_add = []
+            to_remove_balls = []
+            # Inizializza i contatori per il prossimo point_id
+            k = 0
+            seen_coords = set()
+            for point_id1, data1 in drone1_points.items():
+                for point_id2, data2 in drone2_points.items():
+                    if self.point_id_to_index(point_id2) > self.point_id_to_index(point_id1):
+                        next_point_id_drone1 = self.get_next_point_id(drone1_id)
+                        if 0 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
+                            new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist()
+                            new_coords_tuple = tuple(np.mean([data1['coords'], data2['coords']], axis=0).tolist())
+                            new_type = data1['type']
+                            if data1['addition'] == 'last' or data2['addition'] == 'last':
+                                addition_type = 'last'
+                            else:
+                                addition_type = 'previous'
+                            if new_coords_tuple not in seen_coords:
+                                # Accumula le chiavi da rimuovere
+                                to_remove.append(point_id1)
+                                to_remove.append(point_id2)
+                                to_remove_balls.append((drone1_id, point_id1))
+                                to_remove_balls.append((drone2_id, point_id2))
+                                # Incrementa i contatori
+                                next_point_id_drone1 = self.increment_point_id(next_point_id_drone1,k)
+                                k+=1
+                                # Accumula le chiavi con i rispettivi valori da aggiungere
+                                to_add.append((next_point_id_drone1, {'coords': new_coords, 'type': new_type, 'addition': addition_type}))
+                                # SOSTITUZIONE EDGE NELLA ADJACENCY MATRIX
+                                self.adjacency_matrices[drone1_id] = self.replace_node_in_adjacency_matrix(
+                                    self.adjacency_matrices[drone1_id],
+                                    point_id1,
+                                    next_point_id_drone1)
+                                seen_coords.add(new_coords_tuple)
+
+            # Rimuovi le vecchie istanze e le vecchie palline
+            to_remove = set(to_remove) #evita ripetizioni
+            for point_id in to_remove:
+                del self.drones_db[drone1_id][point_id]
+            for drone_id, point_id in to_remove_balls:
+                self.remove_visual_ball(drone_id, point_id)
+        
+            # Aggiungi i nuovi nodi e visualizzazioni
+            for point_id, data in to_add:
+                self.drones_db[drone1_id][point_id] = data
+                self.add_visual_ball(drone1_id, point_id, data['coords'])
 
     def replace_node_in_adjacency_matrix(self,
                                          adjacency_matrix,
