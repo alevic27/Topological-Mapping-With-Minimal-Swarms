@@ -424,7 +424,7 @@ class MapAviary(ProjAviary):
         cv = self.C_VEL     
         omega = np.array([[0.] for j in range(self.NUM_DRONES)])
         vel = np.array([[0. , 0. , 0.] for j in range(self.NUM_DRONES)])
-        state_2_omega_coeff = 1  # <1 per allargare il raggio di curvatura del WFSTATE = 2
+        state_2_omega_coeff = 0.95 # <1 per allargare il raggio di curvatura del WFSTATE = 2
         time_step  = 1 / self.CTRL_FREQ
         
         for i in range(self.NUM_DRONES) :
@@ -452,7 +452,7 @@ class MapAviary(ProjAviary):
                 if self.S_WF[i][0] == 1: # wallfollowing con muro a destra
                     print("differenza tra range destro e range destro precedente: ",np.abs(rR - self.prev_rR[i][0]))
                     if self.IM_IN_A_CORNER[i][0] == True:
-                        if np.abs(rB - self.DIST_WALL_REF) < 8*self.td and np.abs(rR - self.DIST_WALL_REF) < 5*self.td: # se dietro e destra so circa ar top
+                        if np.abs(rB - self.DIST_WALL_REF) < 9*self.td and np.abs(rR - self.DIST_WALL_REF) < 6*self.td: # se dietro e destra so circa ar top
                             if rR != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.05 : # TODO: aggiusta sensibilità
                                 self._SwitchWFSTATE(i, 1)
                                 self.state1counter[i][0] = 0
@@ -464,7 +464,7 @@ class MapAviary(ProjAviary):
                 elif self.S_WF[i][0] == -1: # wallfollowing con muro a sinistra                    
                     print("differenza tra range sinistro e range sinistro precedente: ",np.abs(rL - self.prev_rL[i][0]))
                     if self.IM_IN_A_CORNER[i][0] == True:
-                        if np.abs(rB - self.DIST_WALL_REF) < 8*self.td and np.abs(rL - self.DIST_WALL_REF) < 5*self.td: # se dietro e sinistra so circa ar top
+                        if np.abs(rB - self.DIST_WALL_REF) < 9*self.td and np.abs(rL - self.DIST_WALL_REF) < 6*self.td: # se dietro e sinistra so circa ar top
                             if rL != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.05 : # TODO: aggiusta sensibilità
                                 self._SwitchWFSTATE(i, 1)
                                 self.state1counter[i][0] = 0
