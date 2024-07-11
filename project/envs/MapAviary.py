@@ -1045,9 +1045,10 @@ class MapAviary(ProjAviary):
                             # Accumula le chiavi con i rispettivi valori da aggiungere
                             to_add.append((next_point_id_drone1, {'coords': new_coords, 'type': new_type, 'addition': addition_type}))
                             # SOSTITUZIONE EDGE NELLA ADJACENCY MATRIX
-                            self.adjacency_matrices[drone_id] = self.replace_node_in_adjacency_matrix(
+                            self.adjacency_matrices[drone_id] = self.replace_2nodes_in_adjacency_matrix(
                                 self.adjacency_matrices[drone_id],
                                 point_id1,
+                                point_id2,
                                 next_point_id_drone1)
                             seen_coords.add(new_coords_tuple)
 
@@ -1089,7 +1090,7 @@ class MapAviary(ProjAviary):
                 for point_id_drone2, data2 in drone2_points.items():
                     next_point_id_drone1 = self.get_next_point_id(drone1_id)
                     next_point_id_drone2 = self.get_next_point_id(drone2_id)
-                    if 0 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
+                    if 0.1 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
                         new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist()
                         new_type = data1['type']
                         # Accumula le chiavi da rimuovere
@@ -1176,6 +1177,53 @@ class MapAviary(ProjAviary):
 
         return new_matrix
 
+    def replace_2nodes_in_adjacency_matrix(self,
+                                           adjacency_matrix,
+                                           node1_id,
+                                           node2_id,
+                                           new_node_id):
+        """
+        Unisce due nodi in una matrice di adiacenza in un nuovo nodo, trasferendo tutti gli edge.
+
+        Parameters
+        ----------
+        adjacency_matrix : np.ndarray
+            La matrice di adiacenza.
+        node1_id : str
+            L'ID 'xxxx' del primo nodo da unire.
+        node2_id : str
+            L'ID 'xxxx' del secondo nodo da unire.
+        new_node_id : str
+            L'ID 'xxxx' del nuovo nodo che sostituirà i due nodi.
+
+        Returns
+        -------
+        np.ndarray
+            La nuova matrice di adiacenza con i nodi uniti.
+        """
+        node1 = self.point_id_to_index(node1_id)
+        node2 = self.point_id_to_index(node2_id)
+        new_node = self.point_id_to_index(new_node_id)
+
+        num_nodes = adjacency_matrix.shape[0]
+
+        # Creiamo una nuova matrice di adiacenza con una dimensione aumentata di 1
+        new_matrix = np.zeros((num_nodes + 1, num_nodes + 1), dtype=int)
+
+        # Copiamo la matrice di adiacenza originale nella nuova matrice
+        new_matrix[:num_nodes, :num_nodes] = adjacency_matrix
+
+        # Trasferiamo tutti gli edge dai vecchi nodi al nuovo nodo
+        new_matrix[new_node, :-1] = np.maximum(adjacency_matrix[node1, :], adjacency_matrix[node2, :])
+        new_matrix[:-1, new_node] = np.maximum(adjacency_matrix[:, node1], adjacency_matrix[:, node2])
+
+        # Impostiamo a zero le righe e le colonne dei vecchi nodi
+        new_matrix[node1, :] = 0
+        new_matrix[:, node1] = 0
+        new_matrix[node2, :] = 0
+        new_matrix[:, node2] = 0
+
+        return new_matrix
 
     def increment_point_id(self,string,quantity):
         """Incrementa una stringa di point_id del tipo 'xxxx' di quantityù
