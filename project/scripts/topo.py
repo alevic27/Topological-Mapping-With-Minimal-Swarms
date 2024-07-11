@@ -42,9 +42,9 @@ DEFAULT_CONTROL_VELOCITY: float = 0.2  #works with 0.2
 DEFAULT_WFSTATE : int = -1
 DEFAULT_THRESHOLD_DISTANCE : float = 0.03
 
-DEFAULT_MERGING_GRAPHS_LOGIC = True
-DEFAULT_EDGES_VISUALIZATION = True
-DEFAULT_SAME_DRONE_MERGING = True
+DEFAULT_MERGING_GRAPHS_LOGIC = False
+DEFAULT_EDGES_VISUALIZATION = False
+DEFAULT_SAME_DRONE_MERGING = False
 
 def run(
         drone=DEFAULT_DRONES,
@@ -77,8 +77,8 @@ def run(
         [-3.0, 0., 1.0]
     ])
     INIT_XYZS = np.array([
-        [-3.0, 0., 1.0],
-        [-3.1, 0., 1.0]
+         [-3.0, 0., 1.0],
+         [-3.5, 0., 1.0]
         ])
     INIT_RPYS = np.array([
         [0., 0., -0.5]

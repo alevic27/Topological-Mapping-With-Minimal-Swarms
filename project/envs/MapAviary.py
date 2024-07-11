@@ -116,6 +116,8 @@ class MapAviary(ProjAviary):
         # il terzo si aggiorna insieme al secondo e indica la direzione della distanza minima in qualche modo
         self.state1counter = np.array([[0] for j in range(self.NUM_DRONES)] )
         self.state4counter = np.array([[0] for j in range(self.NUM_DRONES)] )
+        self.state3counterL=np.array([[0] for j in range(self.NUM_DRONES)] )
+        self.state3counterR=np.array([[0] for j in range(self.NUM_DRONES)] )
         self.state6counter = np.array([[0] for j in range(self.NUM_DRONES)] )
         self.td = td ## threshold distance to determine wether the drone is almost at reference distance from wall
         self.IM_IN_A_CORNER = np.array([[False] for j in range(self.NUM_DRONES)] )
@@ -158,12 +160,8 @@ class MapAviary(ProjAviary):
                     self.memory_position[i][3:6] = obs[i][7:10]
                 RELATIVE_FRAME_DIRECTION = [0. , 1. , 1. ]
                 ABSOLUTE_FRAME_DIRECTION = np.dot(RELATIVE_FRAME_DIRECTION, rot_mat.T )    
-                TARGET_POS[i][0] =  self.memory_position[i][0] + 0.2* ABSOLUTE_FRAME_DIRECTION[0]
-                if self.S_WF[i] == 1 :
-                    TARGET_POS[i][1] =  self.memory_position[i][1] - 0.2 * ABSOLUTE_FRAME_DIRECTION[1]
-                else :
-                    TARGET_POS[i][1] =  self.memory_position[i][1] + 0.2 *ABSOLUTE_FRAME_DIRECTION[1]
-
+                TARGET_POS[i][0] =  self.memory_position[i][0] - self.S_WF[i]* 0.2* ABSOLUTE_FRAME_DIRECTION[0]
+                TARGET_POS[i][1] =  self.memory_position[i][1] - self.S_WF[i]* 0.2 *ABSOLUTE_FRAME_DIRECTION[1]
                 TARGET_POS[i][2] =  self.memory_position[i][2] + 0.2 * ABSOLUTE_FRAME_DIRECTION[2]
 
                 TARGET_RPY[i][0] = self.memory_position[i][3]
@@ -553,27 +551,27 @@ class MapAviary(ProjAviary):
                     # e solo ora faccio la verifica con grosso salto di rR # TODO sensibilità da tunare
                     if self.S_WF[i][0] == 1: # wallfollowing con muro a destra
                         print("la differenza tra il range destro attuale e precedente è:", np.abs(rR - self.prev_rR[i][0]) )
-                        print("la tolleranza per passare a 3 è", self.td*0.0015)
-                        if self.prev_rR[i][0] != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.003 :
+                        print("la tolleranza per passare a 3 è", self.td)
+                        if self.prev_rR[i][0] != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td :
                              # TODO: tuning coefficiente, numero ideale circa 0.0015, troppo stringente in alcuni casi
                              # possibili fix:
                              # migliorare uscita da 2
                              # modificare la logica e fare 2>>>0 , 0>>>3, 3>>>1
-                            self._SwitchWFSTATE(i, 4)
+                            self._SwitchWFSTATE(i, 3)
                             self.WF_ref_angle[i] = self.rpy[i][2]
-                            print("esco da WFSTATE = 2 e entro in WFSTATE = 4 poichè sono abbastanza allineato col muro")
+                            print("esco da WFSTATE = 2 e entro in WFSTATE = 43poichè sono abbastanza allineato col muro")
                         if np.abs(rR - self.prev_rR[i][0]) > 0.5 or rR == self.MAX_RANGE:
-                            self._SwitchWFSTATE(i, 4)
-                            self.WF_ref_angle[i] = self.rpy[i][2]
-                            self.state4counter[i][0] = 0
+                           self._SwitchWFSTATE(i, 3)
+                           self.WF_ref_angle[i] = self.rpy[i][2]
+                           self.state4counter[i][0] = 0
                     elif self.S_WF[i][0] == -1: # wallfollowing con muro a sinistra
                         print("la differenza tra il range sinistro attuale e precedente è:", np.abs(rL - self.prev_rL[i][0]) )
-                        if self.prev_rL[i][0] != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.003 : # 0.0015 era bono
-                            self._SwitchWFSTATE(i, 4)
+                        if self.prev_rL[i][0] != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td  : # 0.0015 era bono
+                            self._SwitchWFSTATE(i, 3)
                             self.WF_ref_angle[i] = self.rpy[i][2]
-                            print("esco da WFSTATE = 2 e entro in WFSTATE = 4 poichè sono abbastanza allineato col muro")
+                            print("esco da WFSTATE = 2 e entro in WFSTATE = 3 poichè sono abbastanza allineato col muro")
                         if np.abs(rL - self.prev_rL[i][0]) > 0.5 or rL == self.MAX_RANGE:
-                            self._SwitchWFSTATE(i, 4)
+                            self._SwitchWFSTATE(i, 3)
                             self.WF_ref_angle[i] = self.rpy[i][2]
                             self.state4counter[i][0] = 0
 
@@ -582,28 +580,42 @@ class MapAviary(ProjAviary):
         ### possibili migliorie:
         ###                    
             elif self.WFSTATE[i][0] == 3: 
-                omega[i] = ([0]) 
-                vel [i] = np.dot(  cv , [0. , 0. , 0.] )
                 if self.S_WF[i][0] == 1: # wallfollowing con muro a destra
-                    if np.abs(rR - self.DIST_WALL_REF) < self.td*0.5:
-                        self._SwitchWFSTATE(i, 1)
-                        self.state1counter[i][0] = 0
-                        #self.WF_ref_angle[i] = self.rpy[i][2]
-                        print("esco da WFSTATE = 3 e entro in WFSTATE = 1 poichè sono alla dist giusta dal muro")
-                    elif rR > self.DIST_WALL_REF:
-                        vel[i] = np.dot(  cv , [0.7 , -0.7 , 0.] )
-                    else:
-                        vel[i] = np.dot(  cv , [0.7 , +0.7 , 0.] )
+                    self.state3counterR[i][0] += 1
+                    if  (np.abs(rR - self.prev_rR[i][0])  > 0.5 or rR == self.MAX_RANGE) and self.state3counterR[i][0] < 50 :
+                        vel [i] = np.dot(  cv , [1. , 0. , 0.] )
+                        omega[i] = ([0]) 
+                    else :
+                        omega[i] = ([0]) 
+                        vel [i] = np.dot(  cv , [0. , 0. , 0.] )
+                        if np.abs(rR - self.DIST_WALL_REF) < self.td*0.5:
+                            self._SwitchWFSTATE(i, 1)
+                            self.state1counter[i][0] = 0
+                            self.state3counterR[i][0] = 0
+                            #self.WF_ref_angle[i] = self.rpy[i][2]
+                            print("esco da WFSTATE = 3 e entro in WFSTATE = 1 poichè sono alla dist giusta dal muro")
+                        elif rR > self.DIST_WALL_REF:
+                            vel[i] = np.dot(  cv , [0.7 , -0.7 , 0.] )
+                        else:
+                            vel[i] = np.dot(  cv , [0.7 , +0.7 , 0.] )
                 elif self.S_WF[i][0] == -1: # wallfollowing con muro a sinistra
-                    if np.abs(rL - self.DIST_WALL_REF) < self.td*0.5:
-                        self._SwitchWFSTATE(i, 1)
-                        self.state1counter[i][0] = 0
-                        #self.WF_ref_angle[i] = self.rpy[i][2]
-                        print("esco da WFSTATE = 3 e entro in WFSTATE = 1 poichè sono alla dist giusta dal muro")
-                    elif rL > self.DIST_WALL_REF:
-                        vel[i] = np.dot(  cv , [0.7 , +0.7 , 0.] )
-                    else:
-                        vel[i] = np.dot(  cv , [0.7 , -0.7 , 0.] )
+                        self.state3counterL[i][0] += 1 
+                        if  (np.abs(rL - self.prev_rL[i][0])  > 0.5 or rL == self.MAX_RANGE) and self.state3counterL[i][0] < 50 :
+                            vel [i] = np.dot(  cv , [1. , 0. , 0.] )
+                            omega[i] = ([0]) 
+                        else:
+                            omega[i] = ([0]) 
+                            vel [i] = np.dot(  cv , [0. , 0. , 0.] )
+                            if np.abs(rL - self.DIST_WALL_REF) < self.td*0.5:
+                                self._SwitchWFSTATE(i, 1)
+                                self.state1counter[i][0] = 0
+                                self.state3counterL[i][0]= 0
+                                #self.WF_ref_angle[i] = self.rpy[i][2]
+                                print("esco da WFSTATE = 3 e entro in WFSTATE = 1 poichè sono alla dist giusta dal muro")
+                            elif rL > self.DIST_WALL_REF:
+                                vel[i] = np.dot(  cv , [0.7 , +0.7 , 0.] )
+                            else:
+                                vel[i] = np.dot(  cv , [0.7 , -0.7 , 0.] )
 
         ######################  STATO 4 : FIX PER LA PERDITA DEL RANGE LATERALE  ############################
         ### avvia se durante la curva il drone vede MAXRANGE e "perde" il muro, così lo faccio avanzare un pò dritto
@@ -709,14 +721,14 @@ class MapAviary(ProjAviary):
             prev_lat_distance = self.prev_rL[nth_drone][0]
     
         if np.abs(alfa) < 0.3 :
-            if np.abs(self.DIST_WALL_REF-lat_distance) > self.td : # sono fuori dalla regione accettabile ( o troppo lontano (distance > dist_wall_ref)) o troppo vicino  (distance < dist_wall_ref)
+            if np.abs(self.DIST_WALL_REF-lat_distance) > 1.5*self.td : # sono fuori dalla regione accettabile ( o troppo lontano (distance > dist_wall_ref)) o troppo vicino  (distance < dist_wall_ref)
                 if lat_distance > self.DIST_WALL_REF : #and self.rpy[nth_drone][2] < self.WF_ref_angle[nth_drone]:     # troppo lontano dal muro
                     omega = ([-self.S_WF[nth_drone][0]*self.C_OMEGA*outside_region_omega_reduction_factor])        # TODO check sign : CHECKED -
                     print("sono fuori dalla regione e troppo lontano dal muro")
                 elif lat_distance < self.DIST_WALL_REF:                                                # troppo vicino al muro
                     omega = ([+self.S_WF[nth_drone][0]*self.C_OMEGA*outside_region_omega_reduction_factor])  # +
                     print("sono fuori dalla regione e troppo vicino al muro")       
-            elif np.abs(self.DIST_WALL_REF-lat_distance) <  self.td : #sono dentro alla regione accettabile
+            elif np.abs(self.DIST_WALL_REF-lat_distance) <  1.5*self.td : #sono dentro alla regione accettabile
                 # meccanismo di fine tune alignment basato su confronto con distance[iesimo drone][0]
                 if prev_lat_distance > lat_distance: # se la distanza dal muro prima era maggiore (mi sto avvicinando)
                     omega = ([+self.S_WF[nth_drone][0]*self.C_OMEGA*inside_region_omega_reduction_factor])     # TODO andiamo a culo vedi se cambiare
@@ -820,18 +832,20 @@ class MapAviary(ProjAviary):
             1 se vedo quel drone e ha id maggiore del mi ;
             2 se vedo quel drone e ha id minore del mio (gli devo lasciare precedenza)
         """
-        collision_treshold = 30*self.td
+        collision_treshold = 1.10*self.DIST_WALL_REF
         drones_position = np.array([self._getDroneStateVector(j)[0:3] for j  in range(self.NUM_DRONES)])
+        drone_velocity = self._getDroneStateVector(nth_drone)[10:13] 
         drones_distance =  np.array([[np.inf] for j in range(self.NUM_DRONES)] )
         collision =  np.array([[0] for j in range(self.NUM_DRONES)] )
 
         for i in range(self.NUM_DRONES):
-            if i!= nth_drone :
+            if i!= nth_drone and self.WFSTATE[i]!=-1:
                 drones_distance[i] = self.euclidean_distance( drones_position[nth_drone], drones_position[i])
-            if drones_distance[i] <= collision_treshold :
-                collision[i] = 1
-                if i < nth_drone:
-                    collision[i] = 2
+                if drones_distance[i] <= collision_treshold :
+                    collision[i] = 1
+                    if i < nth_drone: #and np.dot(drones_position[i],drone_velocity) > 0 and np.dot([self.drones_position_pre[i]-drones_position[i]],drone_velocity) > 0:
+                        collision[i] = 2
+        self.drones_position_pre = drones_position
         return collision 
   
 ############################## CREAZIONE MAPPA TOPOLOGICA ############################################
