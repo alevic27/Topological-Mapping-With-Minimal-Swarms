@@ -660,7 +660,7 @@ class MapAviary(ProjAviary):
         """
         old_WFSTATE = self.WFSTATE[nth_drone][0]  # might use to print stuff
         self.WFSTATE[nth_drone][0] = new_WFSTATE
-        print(old_WFSTATE, ">>", new_WFSTATE)
+        print("drone ",nth_drone, ": " ,old_WFSTATE, ">>", new_WFSTATE)
         if old_WFSTATE != 0 and new_WFSTATE == 1:
             self.add_point(nth_drone,self.pos[nth_drone],'corridor')
         if old_WFSTATE == 1 and new_WFSTATE == 2: # inizio curva
