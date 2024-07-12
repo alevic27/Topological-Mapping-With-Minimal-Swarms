@@ -47,7 +47,6 @@ DEFAULT_MERGING_GRAPHS_LOGIC = True
 DEFAULT_EDGES_VISUALIZATION = True
 DEFAULT_SAME_DRONE_MERGING = True
 
-
 def run(
         drone=DEFAULT_DRONES,
         num_drones=DEFAULT_NUM_DRONES,
@@ -86,8 +85,8 @@ def run(
         [0., 0., -0.5]
         ])
     INIT_RPYS = np.array([
-        [0., 0., -0.5],
-        [0., 0., +0.5]
+        [0., 0., 0.],
+        [0., 0., 0.]
         ])
 
     #INIT_XYZS = np.array([
