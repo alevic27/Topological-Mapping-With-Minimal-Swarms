@@ -127,9 +127,8 @@ class MapAviary(ProjAviary):
         self.state6counter = np.array([[0] for j in range(self.NUM_DRONES)] )
         self.td = td ## threshold distance to determine wether the drone is almost at reference distance from wall
         self.IM_IN_A_CORNER = np.array([[False] for j in range(self.NUM_DRONES)] )
-        self.WFSTATE_WAS_CHANGED = np.array([[0] for j in range(self.NUM_DRONES)] ) 
-        # numero di volte che lo stato è cambiato:
-        # 0 serve a fargli fare un cambio solo ad ogni step, se è 1 non fa switchWFSTATE
+        self.WFSTATE_WAS_CHANGED = np.array([[False] for j in range(self.NUM_DRONES)] ) 
+        self.HOW_MANY_STEPS_AGO_WFSTATE_WAS_CHANGED = np.array([[0] for j in range(self.NUM_DRONES)] ) 
         self.WF_ref_angle = np.array([[0.] for j in range(self.NUM_DRONES)] ) # yaw di riferimento di start dello stato 1 per non allontanarsi troppo dalla direzione parallela
         self.memory_state = np.array([[np.inf] for j in range(self.NUM_DRONES)] ) # memory dello stato in cui ci strova prima di una collision
         self.memory_position = np.array([[0. , 0. ,0. , 0. ,0. ,0.] for j in range(self.NUM_DRONES)] )
@@ -483,13 +482,11 @@ class MapAviary(ProjAviary):
                          self.state6counter[i][0] = 0 
                          self._SwitchWFSTATE(i, self.memory_state[i])
 
-                
-               
             print("vel=", vel[i])
             print("omega=", omega[i][0]) 
             self.prev_rR[i] = rR
             self.prev_rL[i] = rL
-
+            self.WFSTATE_WAS_CHANGED[i][0] = False
             ###### manual override settings ######
             #self.WFSTATE[i] = 0
             #omega[i] = ([0.5])
@@ -507,25 +504,28 @@ class MapAviary(ProjAviary):
         new_WFSTATE : int
             nuovo WFSTATE a cui passare
         """
-        self.WFSTATE_WAS_CHANGED = True
-        old_WFSTATE = self.WFSTATE[nth_drone][0]  # might use to print stuff
-        self.WFSTATE[nth_drone][0] = new_WFSTATE
-        print("drone ",nth_drone, ": " ,old_WFSTATE, ">>", new_WFSTATE)
-        if old_WFSTATE != 0 and new_WFSTATE == 1:
-            self.add_point(nth_drone,self.pos[nth_drone],'corridor')
-        if old_WFSTATE == 1 and new_WFSTATE == 2: # inizio curva
-            self.add_point(nth_drone,self.pos[nth_drone],'junction')
-        if old_WFSTATE == 2: # fine curva
-            if new_WFSTATE == 0 or new_WFSTATE == 3 or new_WFSTATE == 4:
-                self.add_point(nth_drone,self.pos[nth_drone],'junction')    
-          ### se entra in WFSTATE == 0 per uscire da un angolo serve qualcosa che gli ricorda che sta in zero non per raddrizzarsi
-        if old_WFSTATE == 1 and new_WFSTATE == 0: # 
-            self.IM_IN_A_CORNER[nth_drone][0] = True
-        if old_WFSTATE == 0 and new_WFSTATE == 1:
-            if self.IM_IN_A_CORNER[nth_drone][0] == True:
-                self.add_point(nth_drone,self.pos[nth_drone],'corner')
-            self.IM_IN_A_CORNER[nth_drone][0] = False
-
+        if self.WFSTATE_WAS_CHANGED[nth_drone][0] == False:
+            old_WFSTATE = self.WFSTATE[nth_drone][0]  # might use to print stuff
+            self.WFSTATE[nth_drone][0] = new_WFSTATE
+            print("drone ",nth_drone, ": " ,old_WFSTATE, ">>", new_WFSTATE)
+            if old_WFSTATE != 0 and new_WFSTATE == 1:
+                self.add_point(nth_drone,self.pos[nth_drone],'corridor')
+            if old_WFSTATE == 1 and new_WFSTATE == 2: # inizio curva
+                self.add_point(nth_drone,self.pos[nth_drone],'junction')
+            if old_WFSTATE == 2: # fine curva
+                if new_WFSTATE == 0 or new_WFSTATE == 3 or new_WFSTATE == 4:
+                    self.add_point(nth_drone,self.pos[nth_drone],'junction')    
+              ### se entra in WFSTATE == 0 per uscire da un angolo serve qualcosa che gli ricorda che sta in zero non per raddrizzarsi
+            if old_WFSTATE == 1 and new_WFSTATE == 0: # 
+                self.IM_IN_A_CORNER[nth_drone][0] = True
+            if old_WFSTATE == 0 and new_WFSTATE == 1:
+                if self.IM_IN_A_CORNER[nth_drone][0] == True:
+                    self.add_point(nth_drone,self.pos[nth_drone],'corner')
+                self.IM_IN_A_CORNER[nth_drone][0] = False
+            # flagga il contatore come True
+            self.WFSTATE_WAS_CHANGED[nth_drone][0] = True
+        else:
+            print("ha tentato di cambiare stato 2 volte nello stesso step")
 
     ################################################################################
 
