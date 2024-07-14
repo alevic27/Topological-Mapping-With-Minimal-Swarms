@@ -3,6 +3,8 @@ TESTO
 ## Inizializzazione
 
 - Installare tutte le dependencies di gym-pybullet-drones (seguire il readme della repo)
+- Installare libreria shapely
+>> pip install shapely
 - Aprire terminale e runnare
 
 Linux:
