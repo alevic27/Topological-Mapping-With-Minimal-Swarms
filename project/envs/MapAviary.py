@@ -4,6 +4,10 @@ from gymnasium import spaces
 import pkg_resources
 from project.envs.ProjAviary import ProjAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ImageType
+import matplotlib.pyplot as plt
+from shapely.geometry import Point, Polygon
+from shapely.ops import unary_union
+from shapely.affinity import rotate
 
 class MapAviary(ProjAviary):
     "Multi-drone environment class for topological mapping of unknown places"
@@ -37,6 +41,8 @@ class MapAviary(ProjAviary):
                  merging_graphs=False,
                  edges_visualization=False,
                  self_merge=False,
+                 total_area_polygon=Polygon([(0, 0), (2, 0), (2, 2), (4, 2), (4, 0), (6, 0), (6, 4), (0, 4)]),
+                 point_coverage_radius=0.75
                  ):
         
         """Initialization of an environment with drones capable of performing topological mapping.
@@ -121,16 +127,25 @@ class MapAviary(ProjAviary):
         self.state6counter = np.array([[0] for j in range(self.NUM_DRONES)] )
         self.td = td ## threshold distance to determine wether the drone is almost at reference distance from wall
         self.IM_IN_A_CORNER = np.array([[False] for j in range(self.NUM_DRONES)] )
+        self.WFSTATE_WAS_CHANGED = np.array([[0] for j in range(self.NUM_DRONES)] ) 
+        # numero di volte che lo stato è cambiato:
+        # 0 serve a fargli fare un cambio solo ad ogni step, se è 1 non fa switchWFSTATE
         self.WF_ref_angle = np.array([[0.] for j in range(self.NUM_DRONES)] ) # yaw di riferimento di start dello stato 1 per non allontanarsi troppo dalla direzione parallela
         self.memory_state = np.array([[np.inf] for j in range(self.NUM_DRONES)] ) # memory dello stato in cui ci strova prima di una collision
         self.memory_position = np.array([[0. , 0. ,0. , 0. ,0. ,0.] for j in range(self.NUM_DRONES)] )
-        ## database init
+        ## variabili database 
         self.drones_db = {} 
         self.adjacency_matrices = []
         self.custom_id_balls_map = {}
         self.MERGING = merging_graphs
         self.edges_visualization = edges_visualization
         self.SELFMERGE = self_merge
+        ## variabili missione
+        self.total_area_polygon = total_area_polygon
+        self.coverage_percent = 0 #percentuale di area coperta
+        self.point_coverage_radius = point_coverage_radius
+        self.efficiency = 0 # appena il coverage_percent raggiunge il 90% viene salvato come valore temporale
+        self.COVERAGE_IS_ENOUGH = False
     ################################################################################
 
     def NextWP(self,obs,observation): #Aggiungere gli input necessari
@@ -147,6 +162,7 @@ class MapAviary(ProjAviary):
         TARGET_RPY_RATES = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
         #self.S_WF=self._decisionSystem()  # controllare se aggiornare in self o no
         TARGET_OMEGA, RELATIVE_FRAME_VEL , self.WFSTATE , self.S_WF = self._WallFollowing3()
+
         for i in range(self.NUM_DRONES) :
             yaw = obs[i][9]
             print("absolute yaw =", np.degrees(yaw),"°")
@@ -197,6 +213,9 @@ class MapAviary(ProjAviary):
 
         for j in range(self.NUM_DRONES) : # saves actual mindist to distance[0]. It will be the prev_dist of next step
             self.distance[j][0] =  self.distance[j][1]
+        
+        self.coverage_percent = self.calculate_coverage(self.point_coverage_radius)
+        print(f"La percentuale di esplorazione è: {self.coverage_percent:.2f}%")
         return TARGET_POS, TARGET_RPY, TARGET_VEL, TARGET_RPY_RATES
         
     ################################################################################
@@ -470,10 +489,12 @@ class MapAviary(ProjAviary):
             print("omega=", omega[i][0]) 
             self.prev_rR[i] = rR
             self.prev_rL[i] = rL
+
             ###### manual override settings ######
             #self.WFSTATE[i] = 0
             #omega[i] = ([0.5])
-            #vel [i] = ([0.2])            
+            #vel [i] = ([0.2])        
+                
         return omega , vel , self.WFSTATE, self.S_WF 
     
     ################################################################################
@@ -486,6 +507,7 @@ class MapAviary(ProjAviary):
         new_WFSTATE : int
             nuovo WFSTATE a cui passare
         """
+        self.WFSTATE_WAS_CHANGED = True
         old_WFSTATE = self.WFSTATE[nth_drone][0]  # might use to print stuff
         self.WFSTATE[nth_drone][0] = new_WFSTATE
         print("drone ",nth_drone, ": " ,old_WFSTATE, ">>", new_WFSTATE)
@@ -1265,8 +1287,91 @@ class MapAviary(ProjAviary):
         """
         return f'{index + 1:04}'
 
-    
+################ VALUTAZIONE MISSIONE ########################
 
+    def calculate_coverage(self, radius):
+        """
+        Calcola la percentuale di copertura dell'area da parte dei droni.
+
+        Parameters
+        ----------
+        radius : float
+            Il raggio degli intorni circolari intorno a ciascun nodo.
+
+        Returns
+        -------
+        float
+            La percentuale di copertura dell'area.
+        """
+        covered_area = 0
+        buffers = []
+
+        for drone_id, points in self.drones_db.items():
+            for point_id, data in points.items():
+                coords = data['coords']
+                point = Point(coords[0], coords[1])
+                buffer = point.buffer(radius).intersection(self.total_area_polygon)
+                buffers.append(buffer)
+
+        union_buffers = unary_union(buffers)
+        covered_area = union_buffers.area
+        coverage_percent = (covered_area / self.total_area_polygon.area) * 100
+        if coverage_percent >= 90 and self.COVERAGE_IS_ENOUGH == False:
+            self.efficiency = self.step_counter*self.PYB_TIMESTEP
+            self.COVERAGE_IS_ENOUGH = True
+        return coverage_percent
+
+    def plot_coverage(self, evaluator, radius):
+        """
+        Visualizza l'area coperta dai droni all'interno del labirinto.
+
+        Parameters
+        ----------
+        evaluator : DroneMissionEvaluator
+            Un'istanza della classe DroneMissionEvaluator contenente le informazioni sui droni e il poligono dell'area totale.
+        radius : float
+            Il raggio degli intorni circolari intorno a ciascun nodo.
+
+        Returns
+        -------
+        None
+        """
+        fig, ax = plt.subplots()
+
+        # Traccia l'area totale del labirinto
+        rotated_total_area = rotate(evaluator.total_area_polygon, 90, origin=(0, 0))
+        x, y = rotated_total_area.exterior.xy
+        ax.plot(x, y, label='Total Area')
+
+        for drone_id, points in evaluator.drones_db.items():
+            for point_id, data in points.items():
+                coords = data['coords']
+                point = Point(coords[0], coords[1])
+                buffer = point.buffer(radius).intersection(evaluator.total_area_polygon)
+                rotated_buffer = rotate(buffer, 90, origin=(0, 0))
+                if rotated_buffer.geom_type == 'Polygon':
+                    x, y = rotated_buffer.exterior.xy
+                    ax.plot(x, y, label=f'Buffer {point_id}')
+                elif rotated_buffer.geom_type == 'MultiPolygon':
+                    for poly in rotated_buffer:
+                        x, y = poly.exterior.xy
+                        ax.plot(x, y, label=f'Buffer {point_id}')
+                else:
+                    rotated_point = rotate(point, 90, origin=(0, 0))
+                    ax.plot(rotated_point.x, rotated_point.y, 'o', label=f'Buffer {point_id}')
+
+            # Imposta le etichette degli assi
+        plt.xlabel('y')
+        plt.ylabel('x')
+        plt.title('Coverage Area')
+        # Ottieni i limiti degli assi
+        xlim = ax.get_xlim()
+        # Imposta le etichette invertite per l'asse x
+        xticks = np.linspace(xlim[0], xlim[1], num=5)
+        ax.set_xticks(xticks)
+        ax.set_xticklabels([f'{int(label):.0f}' for label in xticks[::-1]])
+        #plt.legend()
+        plt.show()
             
 
 
