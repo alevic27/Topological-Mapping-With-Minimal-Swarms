@@ -41,8 +41,9 @@ class MapAviary(ProjAviary):
                  merging_graphs=False,
                  edges_visualization=False,
                  self_merge=False,
+                 max_distance_between_nodes=0.6,
                  total_area_polygon=Polygon([(0, 0), (2, 0), (2, 2), (4, 2), (4, 0), (6, 0), (6, 4), (0, 4)]),
-                 point_coverage_radius=0.75
+                 point_coverage_radius=0.75,
                  ):
         
         """Initialization of an environment with drones capable of performing topological mapping.
@@ -139,6 +140,7 @@ class MapAviary(ProjAviary):
         self.MERGING = merging_graphs
         self.edges_visualization = edges_visualization
         self.SELFMERGE = self_merge
+        self.max_distance_between_nodes = max_distance_between_nodes
         ## variabili missione
         self.total_area_polygon = total_area_polygon
         self.coverage_percent = 0 #percentuale di area coperta
@@ -289,7 +291,7 @@ class MapAviary(ProjAviary):
                         if np.abs(rB - self.DIST_WALL_REF) < 8*self.td and np.abs(rR - self.DIST_WALL_REF) < 5*self.td: #and np.abs(rF - self.DIST_WALL_REF) > 10*self.td: # se dietro e destra so circa ar top
                             if rR != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.03 : # TODO: aggiusta sensibilità
                                 self._SwitchWFSTATE(i, 1)
-                                self.state1counter[i][0] = 0
+                                self.state1counter[i][0] = -80 
                                 self.WF_ref_angle[i] = self.rpy[i][2]
                                 print("esco da WFSTATE = 0 (in un convesso) e entro in WFSTATE = 1")
                     elif rR != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.01 :  
@@ -301,7 +303,7 @@ class MapAviary(ProjAviary):
                         if np.abs(rB - self.DIST_WALL_REF) < 8*self.td and np.abs(rL - self.DIST_WALL_REF) < 5*self.td: #and np.abs(rF - self.DIST_WALL_REF) > 10*self.td: # se dietro e sinistra so circa ar top
                             if rL != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.03 : # TODO: aggiusta sensibilità
                                 self._SwitchWFSTATE(i, 1)
-                                self.state1counter[i][0] = 0
+                                self.state1counter[i][0] = -80
                                 self.WF_ref_angle[i] = self.rpy[i][2]
                                 print("esco da WFSTATE = 0 (in un convesso) e entro in WFSTATE = 1")
                     elif rL != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.01 :    
@@ -746,7 +748,8 @@ class MapAviary(ProjAviary):
         highest_point_id = max(point_ids, key=lambda x: int(x))
         return highest_point_id
 
-    def get_last_added_point_id(self, drone_id):
+    def get_last_added_point_id(self,
+                                drone_id):
         """
         Restituisce l'ID dell'unico punto che ha nella chiave 'addition' il valore 'last'
         Poi sostituisce 'last' con 'previous'
@@ -764,6 +767,39 @@ class MapAviary(ProjAviary):
             if data['addition'] == 'last':
                 self.drones_db[drone_id][point_id]['addition'] = 'previous'
                 return point_id
+        return None  # Nel caso in cui non ci sia nessun punto con il valore 'last'
+
+    def get_last_added_point_id2(self,
+                                 drone_id):
+        """
+        Restituisce l'ID dell'unico punto che ha nella chiave 'addition' il valore 'last'.
+        Poi sostituisce 'last' con 'previous' per tutti i punti con questo valore.
+
+        Parameters
+        ----------
+        drone_id : int
+            ID del drone di cui vogliamo trovare l'ultimo punto aggiunto.
+
+        Returns
+        -------
+        str
+            L'ID del punto con il valore 'last'.
+        """
+        last_point_ids = []
+
+        # Trova tutti i punti con il valore 'last'
+        for point_id, data in self.drones_db[drone_id].items():
+            if data['addition'] == 'last':
+                last_point_ids.append(point_id)
+
+        # Se ci sono punti con 'last', cambia il loro valore in 'previous'
+        for point_id in last_point_ids:
+            self.drones_db[drone_id][point_id]['addition'] = 'previous'
+
+        # Restituisci l'ID del punto con il valore più alto, se esiste
+        if last_point_ids:
+            return max(last_point_ids, key=self.point_id_to_index)
+
         return None  # Nel caso in cui non ci sia nessun punto con il valore 'last'
 
     def add_point(self,
@@ -792,7 +828,7 @@ class MapAviary(ProjAviary):
         if min_dist > new_point_threshold_distance or point_type == 'junction' or point_type == 'corner':
             ### AGGIUNTA NUOVA CHIAVE AL DIZIONARIO self.drones_db ###
             previous_point_id = self.get_highest_point_id(drone_id)
-            last_added_point = self.get_last_added_point_id(drone_id)
+            last_added_point = self.get_last_added_point_id2(drone_id)
             point_id = self.get_next_point_id(drone_id)
             self.drones_db[drone_id][point_id] = {'coords': coords.copy(), 'type': point_type, 'addition': 'last'}
             print(f'Added point {point_id} to drone {drone_id}')
@@ -811,9 +847,9 @@ class MapAviary(ProjAviary):
                 self.add_edge(drone_id, last_added_point, point_id) #TODO questo di strano ha che collega il punto all'ultimo in termini di codice che però potrebbe essere figlio di un merge qualsiasi anche in un'altra parte della mappa
             if self.MERGING:
                 if self.SELFMERGE == True:
-                    self.merge_similar_points_same_drone(drone_id)
+                    self.merge_similar_points_same_drone2(drone_id,self.max_distance_between_nodes)
                 for i in range(self.NUM_DRONES):
-                    self.merge_similar_points_2_drones(drone_id,i)
+                    self.merge_similar_points_2_drones(drone_id,i,self.max_distance_between_nodes)
             if self.edges_visualization:
                 self.show_edges()
 
@@ -824,8 +860,7 @@ class MapAviary(ProjAviary):
                  point_key2):
         """Da runnare dopo add_point
         scelto un drone drone_id, aggiunge il collegamento (edge) tra un nodo 1 e un nodo 2 
-        nota: funzionamento particolare, prende il numero in elenco dell'id scelto , quindi si rompe se il
-        database ha perso qualche valore, che è previsto succeda
+        
         Parameters
         -------
         drone_id: int
@@ -858,7 +893,7 @@ class MapAviary(ProjAviary):
 
     def merge_similar_points_same_drone(self,
                                         drone_id,
-                                        threshold=0.58):
+                                        threshold=0.6):
         """ confronto incrociato tra i nodi di 2 droni diversi e sostituisce con la media
         Parameters
         -------
@@ -869,7 +904,7 @@ class MapAviary(ProjAviary):
         drone_points = self.drones_db[drone_id]
         to_remove = []
         to_add = []
-        to_remove_balls = []
+        to_remove_balls = set()
         # Inizializza i contatori per il prossimo point_id
         k = 0
         seen_coords = set()
@@ -889,8 +924,8 @@ class MapAviary(ProjAviary):
                             # Accumula le chiavi da rimuovere
                             to_remove.append(point_id1)
                             to_remove.append(point_id2)
-                            to_remove_balls.append((drone_id, point_id1))
-                            to_remove_balls.append((drone_id, point_id2))
+                            to_remove_balls.add((drone_id, point_id1))
+                            to_remove_balls.add((drone_id, point_id2))
                             # Incrementa i contatori
                             next_point_id_drone1 = self.increment_point_id(next_point_id_drone1,k)
                             k+=1
@@ -919,6 +954,76 @@ class MapAviary(ProjAviary):
         # vorrei qui un checker che dice che non ho aggiunto nodi troppo vicini tra loro
         # potrei fare che se ne trova un trio vii
 
+    def merge_similar_points_same_drone2(self,
+                                    drone_id,
+                                    threshold=0.6,
+                                    threshold_2=0.1):
+        """ confronto incrociato tra i nodi dello stesso drone e sostituisce con la media
+        Parameters
+        -------
+        drone_id: int 
+        threshold: float - optional
+        threshold_2: float - optional
+            La soglia per determinare se le nuove coordinate sono troppo vicine a quelle già viste.
+        """
+        def are_coords_too_close(new_coords, seen_coords, threshold):
+            """Verifica se le nuove coordinate sono troppo vicine a qualsiasi coordinata già vista."""
+            for coords in seen_coords:
+                if self.euclidean_distance(new_coords, coords) < threshold:
+                    return True
+            return False
+
+        drone_points = self.drones_db[drone_id]
+        to_remove = []
+        to_add = []
+        to_remove_balls = set()
+        # Inizializza i contatori per il prossimo point_id
+        k = 0
+        seen_coords = set()
+        for point_id1, data1 in drone_points.items():
+            for point_id2, data2 in drone_points.items():
+                if self.point_id_to_index(point_id2) > self.point_id_to_index(point_id1):
+                    next_point_id_drone1 = self.get_next_point_id(drone_id)
+                    if 0 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
+                        new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist() #TODO: aggiungere media pesata (forse)
+                        new_coords_tuple = tuple(new_coords)
+                        new_type = data1['type']
+                        if data1['addition'] == 'last' or data2['addition'] == 'last':
+                            addition_type = 'last'
+                        else:
+                            addition_type = 'previous'
+
+                        # Controlla se le nuove coordinate sono troppo vicine a quelle già viste
+                        if new_coords_tuple not in seen_coords and not are_coords_too_close(new_coords_tuple, seen_coords, threshold_2):
+                            # Accumula le chiavi da rimuovere
+                            to_remove.append(point_id1)
+                            to_remove.append(point_id2)
+                            to_remove_balls.add((drone_id, point_id1))
+                            to_remove_balls.add((drone_id, point_id2))
+                            # Incrementa i contatori
+                            next_point_id_drone1 = self.increment_point_id(next_point_id_drone1, k)
+                            k += 1
+                            # Accumula le chiavi con i rispettivi valori da aggiungere
+                            to_add.append((next_point_id_drone1, {'coords': new_coords, 'type': new_type, 'addition': addition_type}))
+                            # SOSTITUZIONE EDGE NELLA ADJACENCY MATRIX
+                            self.adjacency_matrices[drone_id] = self.replace_2nodes_in_adjacency_matrix(
+                                self.adjacency_matrices[drone_id],
+                                point_id1,
+                                point_id2,
+                                next_point_id_drone1)
+                            seen_coords.add(new_coords_tuple)
+
+        # Rimuovi le vecchie istanze e le vecchie palline
+        to_remove = set(to_remove)  # evita ripetizioni
+        for point_id in to_remove:
+            del self.drones_db[drone_id][point_id]
+        for drone_id, point_id in to_remove_balls:
+            self.remove_visual_ball(drone_id, point_id)
+
+        # Aggiungi i nuovi nodi e visualizzazioni
+        for point_id, data in to_add:
+            self.drones_db[drone_id][point_id] = data
+            self.add_visual_ball(drone_id, point_id, data['coords'])
 
     def merge_similar_points_2_drones(self,
                                       drone1_id,
@@ -939,7 +1044,7 @@ class MapAviary(ProjAviary):
             to_remove_drone2 = []
             to_add_drone1 = []
             to_add_drone2 = []
-            to_remove_balls = []
+            to_remove_balls = set()
             # Inizializza i contatori per il prossimo point_id
             k = 0
             for point_id_drone1, data1 in drone1_points.items():
@@ -952,8 +1057,8 @@ class MapAviary(ProjAviary):
                         # Accumula le chiavi da rimuovere
                         to_remove_drone1.append(point_id_drone1)
                         to_remove_drone2.append(point_id_drone2)
-                        to_remove_balls.append((drone1_id, point_id_drone1))
-                        to_remove_balls.append((drone2_id, point_id_drone2))
+                        to_remove_balls.add((drone1_id, point_id_drone1))
+                        to_remove_balls.add((drone2_id, point_id_drone2))
                         # Incrementa i contatori
                         next_point_id_drone1 = self.increment_point_id(next_point_id_drone1,k)
                         next_point_id_drone2 = self.increment_point_id(next_point_id_drone2,k)
