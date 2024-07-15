@@ -5,6 +5,9 @@ import argparse
 import gymnasium as gym
 import numpy as np
 import csv
+import matplotlib.pyplot as plt
+from shapely.geometry import Point, Polygon
+from shapely.ops import unary_union
 
 from gym_pybullet_drones.utils.Logger import Logger
 from project.envs.MapAviary import MapAviary
@@ -36,6 +39,13 @@ DEFAULT_SENSORS_ATTRIBUTES = True
 DEFAULT_SENSORS_RANGE = 4.
 DEFAULT_REF_DISTANCE = 0.75
 DEFAULT_LABYRINTH_ID = "2t"  # "0" per i 4 oggettini di BaseRLAviary, "lettera" della versione del labirinto 
+DEFAULT_MAP_POLYGON = Polygon([(3., 0.), (1., 0.),(1., 3.1),(2.9, 3.1),(2.9 , 4.9),(-2.9 , 4.9),(-2.9 , 3.1),
+                                (-1, 3.1), (-1, -3.1),(-2.9, -3.1),(-2.9, -4.9),(2.9, -4.9),
+                                (2.9 , -3.1),(1., -3.1),(1., -1.0),(3., -1.)])
+new_coords = [(-x, -y) for x, y in DEFAULT_MAP_POLYGON.exterior.coords]
+DEFAULT_MAP_POLYGON = Polygon(new_coords)
+DEFAULT_POINT_COVERAGE_RADIUS = 0.75 # con 0.75 raggiunge al massimo 70% coverage
+
 DEFAULT_S_WF: int = +1   #wallfollowing side
 DEFAULT_CONTROL_OMEGA : float = 0.5  #works with 0.5
 DEFAULT_CONTROL_VELOCITY: float = 0.2  #works with 0.2
@@ -46,6 +56,7 @@ DEFAULT_THRESHOLD_DISTANCE : float = 0.03
 DEFAULT_MERGING_GRAPHS_LOGIC = False
 DEFAULT_EDGES_VISUALIZATION = False
 DEFAULT_SAME_DRONE_MERGING = False
+
 
 def run(
         drone=DEFAULT_DRONES,
@@ -70,6 +81,8 @@ def run(
         merging_graphs=DEFAULT_MERGING_GRAPHS_LOGIC,
         edges_visualization=DEFAULT_EDGES_VISUALIZATION,
         self_merge=DEFAULT_SAME_DRONE_MERGING,
+        total_area_polygon=DEFAULT_MAP_POLYGON,
+        point_coverage_radius=DEFAULT_POINT_COVERAGE_RADIUS,
         ):
     
     ### definisci le posizioni iniziali dei droni
@@ -133,7 +146,9 @@ def run(
                     td=td,
                     merging_graphs=merging_graphs,
                     edges_visualization=edges_visualization,
-                    self_merge=self_merge
+                    self_merge=self_merge,
+                    total_area_polygon=total_area_polygon,
+                    point_coverage_radius=point_coverage_radius
                     )
     
     #### Initialize the controllers ############################
