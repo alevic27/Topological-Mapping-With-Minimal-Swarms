@@ -45,6 +45,7 @@ DEFAULT_MAP_POLYGON = Polygon([(3., 0.), (1., 0.),(1., 3.1),(2.9, 3.1),(2.9 , 4.
 new_coords = [(-x, -y) for x, y in DEFAULT_MAP_POLYGON.exterior.coords]
 DEFAULT_MAP_POLYGON = Polygon(new_coords)
 DEFAULT_POINT_COVERAGE_RADIUS = 0.75 # con 0.75 raggiunge al massimo 70% coverage
+DEFAULT_TARGET_COVERAGE_PERCENT = 80
 
 DEFAULT_S_WF: int = +1   #wallfollowing side
 DEFAULT_CONTROL_OMEGA : float = 0.5  #works with 0.5
@@ -85,6 +86,7 @@ def run(
         max_distance_between_nodes=DEFAULT_MAX_DISTANCE_BETWEEN_NODES,
         total_area_polygon=DEFAULT_MAP_POLYGON,
         point_coverage_radius=DEFAULT_POINT_COVERAGE_RADIUS,
+        target_coverage=DEFAULT_TARGET_COVERAGE_PERCENT,
         ):
     
     ### definisci le posizioni iniziali dei droni
@@ -152,7 +154,8 @@ def run(
                     self_merge=self_merge,
                     max_distance_between_nodes=max_distance_between_nodes,
                     total_area_polygon=total_area_polygon,
-                    point_coverage_radius=point_coverage_radius
+                    point_coverage_radius=point_coverage_radius,
+                    target_coverage=target_coverage,
                     )
     
     #### Initialize the controllers ############################

@@ -45,6 +45,7 @@ class MapAviary(ProjAviary):
                  max_distance_between_nodes=0.6,
                  total_area_polygon=Polygon([(0, 0), (2, 0), (2, 2), (4, 2), (4, 0), (6, 0), (6, 4), (0, 4)]),
                  point_coverage_radius=0.75,
+                 target_coverage=90,
                  ):
         
         """Initialization of an environment with drones capable of performing topological mapping.
@@ -148,6 +149,7 @@ class MapAviary(ProjAviary):
         ## variabili missione
         self.total_area_polygon = total_area_polygon
         self.coverage_percent = 0 #percentuale di area coperta
+        self.TARGET_COVERAGE = target_coverage
         self.point_coverage_radius = point_coverage_radius
         self.efficiency = 0 # appena il coverage_percent raggiunge il 90% viene salvato come valore temporale
         self.COVERAGE_IS_ENOUGH = False
@@ -381,6 +383,7 @@ class MapAviary(ProjAviary):
                             if self.START[i] == 100:
                                 self._SwitchWFSTATE(i, 0)
                                 print("esco da WFSTATE = -1 e entro in WFSTATE = 0")
+                ###### Topological
                 if self.stateminus1counter[i][0] == 100: # era 100 ; TODO: aggiungi che lo fa anche se capisce di essere in junction
                     self.add_point(i,self.pos[i],'corridor')
                     self.stateminus1counter[i][0] = 0   
@@ -428,7 +431,6 @@ class MapAviary(ProjAviary):
         ### possibili migliorie: - rimuovere la cosa che dopo va in 3 e farlo andare in 0
             elif self.WFSTATE[i][0] == 2 :
                 vel [i] = np.dot(  cv , [1. , 0. , 0.] )
-                #omega[i] = ([-self.S_WF[i][0]*state_2_omega_coeff*cv/self.DIST_WALL_REF])
                 omega[i] = ([-self.S_WF[i][0]*state_2_omega_coeff*cv/self.radius[i][0]])
                 self.turn_start_yaw[i][0] += omega[i] * time_step
                 print ("l'angolo di curva accumulato è" , self.turn_start_yaw[i][0])
@@ -558,10 +560,11 @@ class MapAviary(ProjAviary):
         """
 
         if self.WFSTATE_WAS_CHANGED[nth_drone][0] == False: #se non ha già cambiato
+            self.WFSTATE_WAS_CHANGED[nth_drone][0] = True # allora ho cambiato
             old_WFSTATE = self.WFSTATE[nth_drone][0]  # might use to print stuff
             self.WFSTATE[nth_drone][0] = new_WFSTATE
             print("drone ",nth_drone, ": " ,old_WFSTATE, ">>", new_WFSTATE)
-    ## sezione counters ##
+    ## SEZIONE CONTATORI ##
             if new_WFSTATE == 0:
                 self.wfstate0_YAW_counter[nth_drone][0] = 0
             elif new_WFSTATE == 1: 
@@ -578,7 +581,7 @@ class MapAviary(ProjAviary):
                 self.state5counter[nth_drone][0] = 0
             elif new_WFSTATE == 6:
                 self.state6counter[nth_drone][0] = 0
-    ## sezione aggiunta punti ##  
+    ## SEZIONE AGGIUNTA PUNTI ##  
     # TODO: aggiunta punti in stato 4 (SOLO SE NECESSARIO) e -1>>>2
             if old_WFSTATE != 0 and new_WFSTATE == 1:
                 self.add_point(nth_drone,self.pos[nth_drone],'corridor')
@@ -586,41 +589,39 @@ class MapAviary(ProjAviary):
                 self.add_point(nth_drone,self.pos[nth_drone],'junction')
             if old_WFSTATE == 2: # fine curva
                 if new_WFSTATE == 0 or new_WFSTATE == 3 or new_WFSTATE == 4:
-                    self.add_point(nth_drone,self.pos[nth_drone],'junction')    
-            ### se entra in WFSTATE == 0 per uscire da un angolo serve qualcosa che gli ricorda che sta in zero non per raddrizzarsi
+                    self.add_point(nth_drone,self.pos[nth_drone],'junction')
+    #### LOGICA CORNER ACKNOWLEDGEMENT ###
             if old_WFSTATE == 1 and new_WFSTATE == 0: # 
                 self.IM_IN_A_CORNER[nth_drone][0] = True
             if old_WFSTATE == 0 and new_WFSTATE == 1:
                 if self.IM_IN_A_CORNER[nth_drone][0] == True:
                     self.add_point(nth_drone,self.pos[nth_drone],'corner')
                 self.IM_IN_A_CORNER[nth_drone][0] = False
-          # gestione scelta randomica in un incrocio
+    #### gestione scelta randomica in un incrocio
+    # self.MOVE_FORWARD modifica il comportamento degli stati 0 e 4 così che sappiano che sono post-4
             if (old_WFSTATE == 4 and new_WFSTATE == 0) or (old_WFSTATE == 4 and new_WFSTATE == 1):
                 self.MOVE_FORWARD[nth_drone][0] = True
             else:
                 self.MOVE_FORWARD[nth_drone][0] = False 
-          # gestione state dell'obstacle avoidance
+    #### OBSTACLE AVOIDANCE, salva lo stato precedente
             if new_WFSTATE == 5 :
                 self.memory_state[nth_drone] = old_WFSTATE
+    #### GESTISCE SCELTA RAGGIO DELLA CURVA state 2  
             if new_WFSTATE == 2 and old_WFSTATE == -1 :
                 if self.S_WF [nth_drone] == 1 :
                     if self.prev_rR[nth_drone]!= self.MAX_RANGE:
                         self.radius[nth_drone] = self.prev_rR[nth_drone]
                     else:
-                        self.radius[nth_drone] =self.DIST_WALL_REF*1.2
+                        self.radius[nth_drone] = self.DIST_WALL_REF*1.2
                 else:
                     if self.prev_rL[nth_drone]!= self.MAX_RANGE:
                         self.radius[nth_drone] = self.prev_rL[nth_drone]
                     else:
-                        self.radius[nth_drone] =self.DIST_WALL_REF*1.2
+                        self.radius[nth_drone] = self.DIST_WALL_REF*1.2
             elif new_WFSTATE == 2  :
                 self.radius[nth_drone] = self.DIST_WALL_REF
-            # flagga il contatore come True
-            self.WFSTATE_WAS_CHANGED[nth_drone][0] = True
         else:
             print("ha tentato di cambiare stato 2 volte nello stesso step")
-
-
 
     ################################################################################
 
@@ -1571,9 +1572,10 @@ class MapAviary(ProjAviary):
         union_buffers = unary_union(buffers)
         covered_area = union_buffers.area
         coverage_percent = (covered_area / self.total_area_polygon.area) * 100
-        if coverage_percent >= 90 and self.COVERAGE_IS_ENOUGH == False:
+        if coverage_percent >= self.TARGET_COVERAGE and self.COVERAGE_IS_ENOUGH == False:
             self.efficiency = self.step_counter*self.PYB_TIMESTEP
             self.COVERAGE_IS_ENOUGH = True
+            self.plot_coverage() #TODO: vedere come deve esssere l'input EVALUATOR
         return coverage_percent
 
     def plot_coverage(self, evaluator, radius):
