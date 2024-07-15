@@ -124,7 +124,7 @@ class MapAviary(ProjAviary):
         ###################################### (se è minore di DISTREF tocca inventare uno stato di allontanamento ortogonale)
         # il terzo si aggiorna insieme al secondo e indica la direzione della distanza minima in qualche modo
         self.START = np.array([[0] for j in range(self.NUM_DRONES)] )
-        self.stateminus1counter = np.array([[0] for j in range(self.NUM_DRONES)] )
+        self.stateminus1counter = np.array([[-1] for j in range(self.NUM_DRONES)] )
         self.state1counter = np.array([[0] for j in range(self.NUM_DRONES)] )
         self.state3counter = np.array([[0] for j in range(self.NUM_DRONES)] )
         self.state4counter = np.array([[0] for j in range(self.NUM_DRONES)] )
@@ -171,21 +171,40 @@ class MapAviary(ProjAviary):
         TARGET_OMEGA, RELATIVE_FRAME_VEL , self.WFSTATE , self.S_WF = self._WallFollowing3()
 
         for i in range(self.NUM_DRONES) :
-            yaw = obs[i][9]
-            print("absolute yaw =", np.degrees(yaw),"°")
-            rot_mat = np.array([[np.cos(yaw) ,-np.sin(yaw) , 0.0],  
-                                [np.sin(yaw) , np.cos(yaw) , 0.0],                                           
-                                [-1.0        , 0.0         , 1.0]])
-            ABSOLUTE_FRAME_VEL = np.dot(RELATIVE_FRAME_VEL[i], rot_mat.T )
-            if self.WFSTATE[i] == 5:
-                if self.memory_position[i][2] == 0:
-                    self.memory_position[i][0:3] = obs[i][0:3]
-                    self.memory_position[i][3:6] = obs[i][7:10]
-                    if self.S_WF[i] == 1 :
-                        self.spostamento_laterale =  np.abs(self.observation[i][3] - 0.40)
-                    else : 
-                        self.spostamento_lateralespostamento_laterale =  np.abs(self.observation[i][1] - 0.3)
-                if self.memory_state[i] == -1 : #se il drone è nello stato di inizio missione permane nella posizione in attesa di partire
+            if self.COVERAGE_IS_ENOUGH == False:
+                yaw = obs[i][9]
+                print("absolute yaw =", np.degrees(yaw),"°")
+                rot_mat = np.array([[np.cos(yaw) ,-np.sin(yaw) , 0.0],  
+                                    [np.sin(yaw) , np.cos(yaw) , 0.0],                                           
+                                    [-1.0        , 0.0         , 1.0]])
+                ABSOLUTE_FRAME_VEL = np.dot(RELATIVE_FRAME_VEL[i], rot_mat.T )
+                if self.WFSTATE[i] == 5:
+                    if self.memory_position[i][2] == 0:
+                        self.memory_position[i][0:3] = obs[i][0:3]
+                        self.memory_position[i][3:6] = obs[i][7:10]
+                        if self.S_WF[i] == 1 :
+                            self.spostamento_laterale =  np.abs(self.observation[i][3] - 0.40)
+                        else : 
+                            self.spostamento_lateralespostamento_laterale =  np.abs(self.observation[i][1] - 0.3)
+                    if self.memory_state[i] == -1 : #se il drone è nello stato di inizio missione permane nella posizione in attesa di partire
+                        TARGET_POS[i][0] =  self.memory_position[i][0] 
+                        TARGET_POS[i][1] =  self.memory_position[i][1] 
+                        TARGET_POS[i][2] =  self.memory_position[i][2] 
+
+                        TARGET_RPY[i][0] = self.memory_position[i][3]
+                        TARGET_RPY[i][1] = self.memory_position[i][4]   
+                        TARGET_RPY[i][2] = self.memory_position[i][5]
+                    else :
+                        RELATIVE_FRAME_DIRECTION = [0. , 1. , 1. ]
+                        ABSOLUTE_FRAME_DIRECTION = np.dot(RELATIVE_FRAME_DIRECTION, rot_mat.T )  
+                        TARGET_POS[i][0] =  self.memory_position[i][0] - self.S_WF[i]* self.spostamento_laterale* ABSOLUTE_FRAME_DIRECTION[0]
+                        TARGET_POS[i][1] =  self.memory_position[i][1] - self.S_WF[i]* self.spostamento_laterale *ABSOLUTE_FRAME_DIRECTION[1]
+                        TARGET_POS[i][2] =  self.memory_position[i][2] + 0.3 * ABSOLUTE_FRAME_DIRECTION[2]
+
+                        TARGET_RPY[i][0] = self.memory_position[i][3]
+                        TARGET_RPY[i][1] = self.memory_position[i][4]   
+                        TARGET_RPY[i][2] = self.memory_position[i][5] #+ TARGET_OMEGA[i] * time_step # solo il terzo elemento
+                elif self.WFSTATE[i] == 6 and self.memory_state[i] != -1: 
                     TARGET_POS[i][0] =  self.memory_position[i][0] 
                     TARGET_POS[i][1] =  self.memory_position[i][1] 
                     TARGET_POS[i][2] =  self.memory_position[i][2] 
@@ -193,47 +212,33 @@ class MapAviary(ProjAviary):
                     TARGET_RPY[i][0] = self.memory_position[i][3]
                     TARGET_RPY[i][1] = self.memory_position[i][4]   
                     TARGET_RPY[i][2] = self.memory_position[i][5]
-                else :
-                    RELATIVE_FRAME_DIRECTION = [0. , 1. , 1. ]
-                    ABSOLUTE_FRAME_DIRECTION = np.dot(RELATIVE_FRAME_DIRECTION, rot_mat.T )  
-                    TARGET_POS[i][0] =  self.memory_position[i][0] - self.S_WF[i]* self.spostamento_laterale* ABSOLUTE_FRAME_DIRECTION[0]
-                    TARGET_POS[i][1] =  self.memory_position[i][1] - self.S_WF[i]* self.spostamento_laterale *ABSOLUTE_FRAME_DIRECTION[1]
-                    TARGET_POS[i][2] =  self.memory_position[i][2] + 0.3 * ABSOLUTE_FRAME_DIRECTION[2]
 
-                    TARGET_RPY[i][0] = self.memory_position[i][3]
-                    TARGET_RPY[i][1] = self.memory_position[i][4]   
-                    TARGET_RPY[i][2] = self.memory_position[i][5] #+ TARGET_OMEGA[i] * time_step # solo il terzo elemento
-            elif self.WFSTATE[i] == 6 and self.memory_state[i] != -1: 
-                TARGET_POS[i][0] =  self.memory_position[i][0] 
-                TARGET_POS[i][1] =  self.memory_position[i][1] 
-                TARGET_POS[i][2] =  self.memory_position[i][2] 
+                else:
+                    if self.memory_position[i][2] != 0:
+                        self.memory_position[i] = np.array([0., 0., 0., 0. ,0. , 0.])
+                    TARGET_POS[i][0] = obs[i][0] + ABSOLUTE_FRAME_VEL[0] * time_step  
+                    TARGET_POS[i][1] = obs[i][1] + ABSOLUTE_FRAME_VEL[1] * time_step 
+                    TARGET_POS[i][2] = obs[i][2] #+ ABSOLUTE_FRAME_VEL[2] * time_step 
 
-                TARGET_RPY[i][0] = self.memory_position[i][3]
-                TARGET_RPY[i][1] = self.memory_position[i][4]   
-                TARGET_RPY[i][2] = self.memory_position[i][5]
+                    TARGET_RPY[i][0] = obs[i][7]
+                    TARGET_RPY[i][1] = obs[i][8]   
+                    TARGET_RPY[i][2] = obs[i][9] #+ TARGET_OMEGA[i] * time_step # solo il terzo elemento
 
+                TARGET_VEL[i][0] = ABSOLUTE_FRAME_VEL[0]
+                TARGET_VEL[i][1] = ABSOLUTE_FRAME_VEL[1]
+                TARGET_VEL[i][2] = 0.
+
+                TARGET_RPY_RATES[i][0] = 0.
+                TARGET_RPY_RATES[i][1] = 0.
+                TARGET_RPY_RATES[i][2] = TARGET_OMEGA[i]
             else:
-                if self.memory_position[i][2] != 0:
-                    self.memory_position[i] = np.array([0., 0., 0., 0. ,0. , 0.])
-                TARGET_POS[i][0] = obs[i][0] + ABSOLUTE_FRAME_VEL[0] * time_step  
-                TARGET_POS[i][1] = obs[i][1] + ABSOLUTE_FRAME_VEL[1] * time_step 
-                TARGET_POS[i][2] = obs[i][2] #+ ABSOLUTE_FRAME_VEL[2] * time_step 
+            ########## WAYPOINT ########
+                pass
 
-                TARGET_RPY[i][0] = obs[i][7]
-                TARGET_RPY[i][1] = obs[i][8]   
-                TARGET_RPY[i][2] = obs[i][9] #+ TARGET_OMEGA[i] * time_step # solo il terzo elemento
-
-            TARGET_VEL[i][0] = ABSOLUTE_FRAME_VEL[0]
-            TARGET_VEL[i][1] = ABSOLUTE_FRAME_VEL[1]
-            TARGET_VEL[i][2] = 0.
-
-            TARGET_RPY_RATES[i][0] = 0.
-            TARGET_RPY_RATES[i][1] = 0.
-            TARGET_RPY_RATES[i][2] = TARGET_OMEGA[i]
 
         for j in range(self.NUM_DRONES) : # saves actual mindist to distance[0]. It will be the prev_dist of next step
             self.distance[j][0] =  self.distance[j][1]
-        
+        ### CALCOLO COVERAGE PER LA LOGICA DI FINE MISSIONE ###
         self.coverage_percent = self.calculate_coverage(self.point_coverage_radius)
         print(f"La percentuale di esplorazione è: {self.coverage_percent:.2f}%")
         return TARGET_POS, TARGET_RPY, TARGET_VEL, TARGET_RPY_RATES
@@ -362,6 +367,9 @@ class MapAviary(ProjAviary):
             if self.WFSTATE[i] == -1 : 
                 omega [i] = ([0])
                 vel [i] = np.dot(  cv , [1. , 0. , 0.] )
+        ### aggiunta nodo iniziale
+                if self.stateminus1counter[i] == -1:
+                    self.add_point(i,self.pos[i],'start')
                 self.stateminus1counter[i][0] += 1
                 if rL == self.MAX_RANGE or rR == self.MAX_RANGE : 
                     self.START[i] += 1
@@ -384,7 +392,7 @@ class MapAviary(ProjAviary):
                                 self._SwitchWFSTATE(i, 0)
                                 print("esco da WFSTATE = -1 e entro in WFSTATE = 0")
                 ###### Topological
-                if self.stateminus1counter[i][0] == 100: # era 100 ; TODO: aggiungi che lo fa anche se capisce di essere in junction
+                if self.stateminus1counter[i][0] == 140: # era 100 ; TODO: aggiungi che lo fa anche se capisce di essere in junction
                     self.add_point(i,self.pos[i],'corridor')
                     self.stateminus1counter[i][0] = 0   
 
@@ -585,7 +593,7 @@ class MapAviary(ProjAviary):
     # TODO: aggiunta punti in stato 4 (SOLO SE NECESSARIO) e -1>>>2
             if old_WFSTATE != 0 and new_WFSTATE == 1:
                 self.add_point(nth_drone,self.pos[nth_drone],'corridor')
-            if old_WFSTATE == 1 and new_WFSTATE == 2: # inizio curva
+            if new_WFSTATE == 2: # inizio curva
                 self.add_point(nth_drone,self.pos[nth_drone],'junction')
             if old_WFSTATE == 2: # fine curva
                 if new_WFSTATE == 0 or new_WFSTATE == 3 or new_WFSTATE == 4:
@@ -912,7 +920,7 @@ class MapAviary(ProjAviary):
         coords : ndarray
             (3)-shaped array con le coord del punto
         point_type : string
-            può essere 'corridor', 'juction', 'corner'
+            può essere 'corridor', 'juction', 'corner', 'start'
         addition : string
             può essere 'previous', 'last' , 'new'
             'previous': tutti i nodi precedenti
@@ -923,7 +931,7 @@ class MapAviary(ProjAviary):
         if drone_id not in self.drones_db:
             self.drones_db[drone_id] = {}
         min_dist = self.distance_between_newpoint_and_oldpoints(drone_id,coords)
-        if min_dist > new_point_threshold_distance or point_type == 'junction' or point_type == 'corner':
+        if min_dist > new_point_threshold_distance or point_type == 'junction' or point_type == 'corner' or point_type == 'start':
             ### AGGIUNTA NUOVA CHIAVE AL DIZIONARIO self.drones_db ###
             previous_point_id = self.get_highest_point_id(drone_id)
             last_added_point = self.get_last_added_point_id2(drone_id)
@@ -945,12 +953,11 @@ class MapAviary(ProjAviary):
                 self.add_edge(drone_id, last_added_point, point_id) #TODO questo di strano ha che collega il punto all'ultimo in termini di codice che però potrebbe essere figlio di un merge qualsiasi anche in un'altra parte della mappa
             if self.MERGING:
                 if self.SELFMERGE == True:
-                    self.merge_similar_points_same_drone2(drone_id,self.max_distance_between_nodes)
+                    self.merge_similar_points_same_drone(drone_id,self.max_distance_between_nodes)
                 for i in range(self.NUM_DRONES):
-                    self.merge_similar_points_2_drones2(drone_id,i,self.max_distance_between_nodes)
+                    self.merge_similar_points_2_drones(drone_id,i,self.max_distance_between_nodes)
             if self.edges_visualization:
                 self.show_edges()
-
 
     def add_edge(self,
                  drone_id,
@@ -990,69 +997,6 @@ class MapAviary(ProjAviary):
         return np.linalg.norm(np.array(point1) - np.array(point2))
 
     def merge_similar_points_same_drone(self,
-                                        drone_id,
-                                        threshold=0.6):
-        """ confronto incrociato tra i nodi di 2 droni diversi e sostituisce con la media
-        Parameters
-        -------
-        drone1_id: int 
-        drone2_id: int
-        threshold: float - optional
-        """
-        drone_points = self.drones_db[drone_id]
-        to_remove = []
-        to_add = []
-        to_remove_balls = set()
-        # Inizializza i contatori per il prossimo point_id
-        k = 0
-        seen_coords = set()
-        for point_id1, data1 in drone_points.items():
-            for point_id2, data2 in drone_points.items():
-                if self.point_id_to_index(point_id2) > self.point_id_to_index(point_id1):
-                    next_point_id_drone1 = self.get_next_point_id(drone_id)
-                    if 0 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
-                        new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist() #TODO: aggiungere media pesata (forse)
-                        new_coords_tuple = tuple(np.mean([data1['coords'], data2['coords']], axis=0).tolist())
-                        new_type = data1['type']
-                        if data1['addition'] == 'last' or data2['addition'] == 'last':
-                            addition_type = 'last'
-                        else:
-                            addition_type = 'previous'
-                        if new_coords_tuple not in seen_coords:
-                            # Accumula le chiavi da rimuovere
-                            to_remove.append(point_id1)
-                            to_remove.append(point_id2)
-                            to_remove_balls.add((drone_id, point_id1))
-                            to_remove_balls.add((drone_id, point_id2))
-                            # Incrementa i contatori
-                            next_point_id_drone1 = self.increment_point_id(next_point_id_drone1,k)
-                            k+=1
-                            # Accumula le chiavi con i rispettivi valori da aggiungere
-                            to_add.append((next_point_id_drone1, {'coords': new_coords, 'type': new_type, 'addition': addition_type}))
-                            # SOSTITUZIONE EDGE NELLA ADJACENCY MATRIX
-                            self.adjacency_matrices[drone_id] = self.replace_2nodes_in_adjacency_matrix(
-                                self.adjacency_matrices[drone_id],
-                                point_id1,
-                                point_id2,
-                                next_point_id_drone1)
-                            seen_coords.add(new_coords_tuple)
-
-        # Rimuovi le vecchie istanze e le vecchie palline
-        to_remove = set(to_remove) #evita ripetizioni
-        for point_id in to_remove:
-            del self.drones_db[drone_id][point_id]
-        for drone_id, point_id in to_remove_balls:
-            self.remove_visual_ball(drone_id, point_id)
-    
-        # Aggiungi i nuovi nodi e visualizzazioni
-        for point_id, data in to_add:
-            self.drones_db[drone_id][point_id] = data
-            self.add_visual_ball(drone_id, point_id, data['coords'])
-        # un trio di nodi vicini generati da 
-        # vorrei qui un checker che dice che non ho aggiunto nodi troppo vicini tra loro
-        # potrei fare che se ne trova un trio vii
-
-    def merge_similar_points_same_drone2(self,
                                     drone_id,
                                     threshold=0.6,
                                     threshold_2=0.1):
@@ -1080,7 +1024,7 @@ class MapAviary(ProjAviary):
         seen_coords = set()
         for point_id1, data1 in drone_points.items():
             for point_id2, data2 in drone_points.items():
-                if self.point_id_to_index(point_id2) > self.point_id_to_index(point_id1):
+                if self.point_id_to_index(point_id2) > self.point_id_to_index(point_id1) and data1['type']!='start' and data2['type']!='start':
                     next_point_id_drone1 = self.get_next_point_id(drone_id)
                     if 0 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
                         new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist() #TODO: aggiungere media pesata (forse)
@@ -1124,77 +1068,10 @@ class MapAviary(ProjAviary):
             self.add_visual_ball(drone_id, point_id, data['coords'])
 
     def merge_similar_points_2_drones(self,
-                                      drone1_id,
-                                      drone2_id,
-                                      threshold=0.58):
-        """ confronto incrociato tra i nodi di 2 droni diversi e sostituisce con la media
-        Parameters
-        -------
-        drone1_id: int 
-        drone2_id: int
-        threshold: float - optional
-        """
-        drone1_points = self.drones_db[drone1_id]
-        drone2_points = self.drones_db[drone2_id]
-         
-        if drone1_id != drone2_id: # se tolta i droni mergiano anche con sè stessi
-            to_remove_drone1 = []
-            to_remove_drone2 = []
-            to_add_drone1 = []
-            to_add_drone2 = []
-            to_remove_balls = set()
-            # Inizializza i contatori per il prossimo point_id
-            k = 0
-            for point_id_drone1, data1 in drone1_points.items():
-                for point_id_drone2, data2 in drone2_points.items():
-                    next_point_id_drone1 = self.get_next_point_id(drone1_id)
-                    next_point_id_drone2 = self.get_next_point_id(drone2_id)
-                    if 0.1 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
-                        new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist()
-                        new_type = data1['type']
-                        # Accumula le chiavi da rimuovere
-                        to_remove_drone1.append(point_id_drone1)
-                        to_remove_drone2.append(point_id_drone2)
-                        to_remove_balls.add((drone1_id, point_id_drone1))
-                        to_remove_balls.add((drone2_id, point_id_drone2))
-                        # Incrementa i contatori
-                        next_point_id_drone1 = self.increment_point_id(next_point_id_drone1,k)
-                        next_point_id_drone2 = self.increment_point_id(next_point_id_drone2,k)
-                        k+=1
-                        # Accumula le chiavi con i rispettivi valori da aggiungere
-                        if data1['addition'] == 'last':
-                            addition_type1 = 'last'
-                        else:
-                            addition_type1 = 'previous' 
-                        if data2['addition'] == 'last':
-                            addition_type2 = 'last'
-                        else:
-                            addition_type2 = 'previous'     
-                        to_add_drone1.append((next_point_id_drone1, {'coords': new_coords, 'type': new_type, 'addition': addition_type1}))
-                        to_add_drone2.append((next_point_id_drone2, {'coords': new_coords, 'type': new_type, 'addition': addition_type2}))
-                        # SOSTITUZIONE EDGE NELLA ADJACENCY MATRIX
-                        self.adjacency_matrices[drone1_id] = self.replace_node_in_adjacency_matrix(self.adjacency_matrices[drone1_id],point_id_drone1,next_point_id_drone1)
-                        self.adjacency_matrices[drone2_id] = self.replace_node_in_adjacency_matrix(self.adjacency_matrices[drone2_id],point_id_drone2,next_point_id_drone2)
-                        # in teoria serve un if che se trovo corrispondenza tra il mio 0005 e lo 0004 dell'altro che però 0004 c'è l'ho anche io con le stesse coordinate allora va rimosso anche quello
-            # Rimuovi le vecchie istanze e le vecchie palline
-            to_remove_drone1 = set(to_remove_drone1) #evita ripetizioni
-            to_remove_drone2 = set(to_remove_drone2)
-            for point_id in to_remove_drone1:
-                del self.drones_db[drone1_id][point_id]
-            for point_id in to_remove_drone2:
-                del self.drones_db[drone2_id][point_id]
-            for drone_id, point_id in to_remove_balls:
-                self.remove_visual_ball(drone_id, point_id)
-
-            # Aggiungi i nuovi nodi e visualizzazioni
-            for point_id, data in to_add_drone1:
-                self.drones_db[drone1_id][point_id] = data
-                self.add_visual_ball(drone1_id, point_id, data['coords'])
-            for point_id, data in to_add_drone2:
-                self.drones_db[drone2_id][point_id] = data
-                self.add_visual_ball(drone2_id, point_id, np.add(data['coords'],[0,0,0.05])) 
-
-    def merge_similar_points_2_drones2(self, drone1_id, drone2_id, threshold=0.58, threshold_2=0.1):
+                                       drone1_id,
+                                       drone2_id,
+                                       threshold=0.58,
+                                       threshold_2=0.1):
         """ confronto incrociato tra i nodi di 2 droni diversi e sostituisce con la media
         Parameters
         -------
@@ -1221,7 +1098,7 @@ class MapAviary(ProjAviary):
                 for point_id_drone2, data2 in drone2_points.items():
                     next_point_id_drone1 = self.get_next_point_id(drone1_id)
                     next_point_id_drone2 = self.get_next_point_id(drone2_id)
-                    if 0.1 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold:
+                    if 0.1 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold and data1['type']!='start' and data2['type']!='start':
                         new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist()
                         new_coords_tuple = tuple(new_coords)
 
@@ -1544,14 +1421,6 @@ class MapAviary(ProjAviary):
                         point_a_coords = drone_points[point_a_id]['coords']
                         point_b_coords = drone_points[point_b_id]['coords']
                         self.add_visual_line(drone_id,point_a_coords,point_b_coords)
-                                            # np.add(point_a_coords,[0,0,z*0.05]),
-                                            # np.add(point_b_coords,[0,0,z*0.05]))
-
-            #for i in range(adjacency_matrix.shape[0]):
-            #    for j in range(adjacency_matrix.shape[0]):
-            #        if adjacency_matrix[i][j] == 1:
-            #            point_a_id = 
-            #            point_b_id
   
     def point_id_to_index(self, point_id:str):
         """
@@ -1666,6 +1535,11 @@ class MapAviary(ProjAviary):
         #plt.legend()
         plt.show()
             
+############ WAYPOINT FINE MISSIONE ################
+    def get_closest_node(self,
+                         drone_id):
+        """
+        trova il nodo più vicino da cui iniziare il tracciato
+        """
 
-
-        
+        pass

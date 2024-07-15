@@ -11,6 +11,7 @@ from shapely.ops import unary_union
 
 from gym_pybullet_drones.utils.Logger import Logger
 from project.envs.MapAviary import MapAviary
+from project.assets.assets_list import Labyrinth, LABYRINTH_CONFIG
 from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
 from gym_pybullet_drones.utils.utils import sync, str2bool
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType
@@ -37,13 +38,19 @@ DEFAULT_IMG_RES = np.array([64, 48])
 
 DEFAULT_SENSORS_ATTRIBUTES = True
 DEFAULT_SENSORS_RANGE = 4.
-DEFAULT_REF_DISTANCE = 0.75
-DEFAULT_LABYRINTH_ID = "2t"  # "0" per i 4 oggettini di BaseRLAviary, "lettera" della versione del labirinto 
-DEFAULT_MAP_POLYGON = Polygon([(3., 0.), (1., 0.),(1., 3.1),(2.9, 3.1),(2.9 , 4.9),(-2.9 , 4.9),(-2.9 , 3.1),
-                                (-1, 3.1), (-1, -3.1),(-2.9, -3.1),(-2.9, -4.9),(2.9, -4.9),
-                                (2.9 , -3.1),(1., -3.1),(1., -1.0),(3., -1.)])
+
+##### SCELTA LABIRINTO tra:
+# DOUBLE_T
+# DOUBLE_T_2X
+DEFAULT_LABYRINTH_ID = Labyrinth.DOUBLE_T #modificare solo questa riga
+# Configurazione del labirinto selezionato
+selected_config = LABYRINTH_CONFIG[DEFAULT_LABYRINTH_ID]
+DEFAULT_MAP_POLYGON = selected_config["polygon"]
 new_coords = [(-x, -y) for x, y in DEFAULT_MAP_POLYGON.exterior.coords]
 DEFAULT_MAP_POLYGON = Polygon(new_coords)
+STARTING_COORDS_OFFSET = selected_config["starting_coords_offset"]
+
+DEFAULT_REF_DISTANCE = 0.75
 DEFAULT_POINT_COVERAGE_RADIUS = 0.75 # con 0.75 raggiunge al massimo 70% coverage
 DEFAULT_TARGET_COVERAGE_PERCENT = 80
 
@@ -100,6 +107,7 @@ def run(
          [-2.2, 0., 1.0],
          [-2.5, 0., 1.0]
         ])
+    INIT_XYZS += STARTING_COORDS_OFFSET
     INIT_RPYS = np.array([
         [0., 0., -0.5]
         ])

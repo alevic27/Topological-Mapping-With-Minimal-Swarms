@@ -106,6 +106,9 @@ class DroneMissionEvaluator:
 total_area_polygon = Polygon([(3.0, 1.0), (1.0, 1.0), (1.0, 3.1), (2.9, 3.1), (2.9 , 4.9), (-2.9 , 4.9),
                               (-2.9 , 3.1), (-1, 3.1), (-1, -3.1),(-2.9, -3.1),(-2.9, -4.9),(2.9, -4.9),
                                 (2.9 , -3.1),(1., -3.1),(1., -1.0),(3., -1.)])
+total_area_polygon = Polygon([(6.0, 0.0), (2.0, 0.0), (2.0, 6.2), (5.8, 6.2), (5.8, 9.8), (-5.8, 9.8), (-5.8, 6.2),
+                            (-2.0, 6.2), (-2.0, -6.2), (-5.8, -6.2), (-5.8, -9.8), (5.8, -9.8), (5.8, -6.2),
+                            (2.0, -6.2), (2.0, -2.0), (6.0, -2.0)])
 new_coords = [(-x, -y) for x, y in total_area_polygon.exterior.coords]
 total_area_polygon = Polygon(new_coords)
 print("l'area totale è: ",total_area_polygon.area)
