@@ -233,6 +233,9 @@ class MapAviary(ProjAviary):
                 TARGET_RPY_RATES[i][2] = TARGET_OMEGA[i]
             else:
             ########## WAYPOINT ########
+            # usando wp_counters e NUM_WP, restituiti da 
+                #TARGET_POS[i] = NEXT_WP
+
                 pass
 
 
@@ -955,7 +958,7 @@ class MapAviary(ProjAviary):
                 if self.SELFMERGE == True:
                     self.merge_similar_points_same_drone(drone_id,self.max_distance_between_nodes)
                 for i in range(self.NUM_DRONES):
-                    self.merge_similar_points_2_drones(drone_id,i,self.max_distance_between_nodes)
+                    self.merge_similar_points_2_drones2(drone_id,i,self.max_distance_between_nodes)
             if self.edges_visualization:
                 self.show_edges()
 
@@ -1110,6 +1113,84 @@ class MapAviary(ProjAviary):
                             to_remove_drone2.append(point_id_drone2)
                             to_remove_balls.add((drone1_id, point_id_drone1))
                             to_remove_balls.add((drone2_id, point_id_drone2))
+                            # Incrementa i contatori
+                            next_point_id_drone1 = self.increment_point_id(next_point_id_drone1, k)
+                            next_point_id_drone2 = self.increment_point_id(next_point_id_drone2, k)
+                            k += 1
+                            # Accumula le chiavi con i rispettivi valori da aggiungere
+                            addition_type1 = 'last' if data1['addition'] == 'last' else 'previous'
+                            addition_type2 = 'last' if data2['addition'] == 'last' else 'previous'
+                            to_add_drone1.append((next_point_id_drone1, {'coords': new_coords, 'type': new_type, 'addition': addition_type1}))
+                            to_add_drone2.append((next_point_id_drone2, {'coords': new_coords, 'type': new_type, 'addition': addition_type2}))
+                            # SOSTITUZIONE EDGE NELLA ADJACENCY MATRIX
+                            self.adjacency_matrices[drone1_id] = self.replace_node_in_adjacency_matrix(self.adjacency_matrices[drone1_id], point_id_drone1, next_point_id_drone1)
+                            self.adjacency_matrices[drone2_id] = self.replace_node_in_adjacency_matrix(self.adjacency_matrices[drone2_id], point_id_drone2, next_point_id_drone2)
+                            # Aggiungi le nuove coordinate a seen_coords
+                            seen_coords.add(new_coords_tuple)
+
+            # Rimuovi le vecchie istanze e le vecchie palline
+            to_remove_drone1 = set(to_remove_drone1) # evita ripetizioni
+            to_remove_drone2 = set(to_remove_drone2)
+            for point_id in to_remove_drone1:
+                del self.drones_db[drone1_id][point_id]
+            for point_id in to_remove_drone2:
+                del self.drones_db[drone2_id][point_id]
+            for drone_id, point_id in to_remove_balls:
+                self.remove_visual_ball(drone_id, point_id)
+
+            # Aggiungi i nuovi nodi e visualizzazioni
+            for point_id, data in to_add_drone1:
+                self.drones_db[drone1_id][point_id] = data
+                self.add_visual_ball(drone1_id, point_id, data['coords'])
+            for point_id, data in to_add_drone2:
+                self.drones_db[drone2_id][point_id] = data
+                self.add_visual_ball(drone2_id, point_id, data['coords'])
+
+    def merge_similar_points_2_drones2(self,
+                                       drone1_id,
+                                       drone2_id,
+                                       threshold=0.58,
+                                       threshold_2=0.1):
+        """ confronto incrociato tra i nodi di 2 droni diversi e sostituisce con la media
+        Parameters
+        -------
+        drone1_id: int 
+        drone2_id: int
+        threshold: float - optional
+        threshold_2: float - optional
+            La distanza minima tra i nuovi punti aggiunti per evitare densità eccessive di nodi.
+        """
+        drone1_points = self.drones_db[drone1_id]
+        drone2_points = self.drones_db[drone2_id]
+
+        if drone1_id != drone2_id: # se tolta i droni mergiano anche con sè stessi
+            to_remove_drone1 = []
+            to_remove_drone2 = []
+            to_add_drone1 = []
+            to_add_drone2 = []
+            to_remove_balls = set()
+            seen_coords = set()
+
+            # Inizializza i contatori per il prossimo point_id
+            k = 0
+            for point_id_drone1, data1 in drone1_points.items():
+                for point_id_drone2, data2 in drone2_points.items():
+                    next_point_id_drone1 = self.get_next_point_id(drone1_id)
+                    next_point_id_drone2 = self.get_next_point_id(drone2_id)
+                    if 0.1 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold and data1['type']!='start' and data2['type']!='start':
+                        new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist()
+                        new_coords_tuple = tuple(new_coords)
+                        # Accumula le chiavi da rimuovere a prescindere dall'aggiunta o no di un nuovo nodo mediato
+                        to_remove_drone1.append(point_id_drone1)
+                        to_remove_drone2.append(point_id_drone2)
+                        to_remove_balls.add((drone1_id, point_id_drone1))
+                        to_remove_balls.add((drone2_id, point_id_drone2))
+                        # Verifica che le nuove coordinate non siano troppo vicine a quelle già viste
+                        # ora se non ho già messo un nodo da quelle parti lo aggiungo
+                        if not any(self.euclidean_distance(new_coords, seen_coord) < threshold_2 for seen_coord in seen_coords):
+                            new_type = data1['type']
+                            if data1['type'] == 'junction' or data2['type'] == 'junction':
+                                new_type = 'junction'
                             # Incrementa i contatori
                             next_point_id_drone1 = self.increment_point_id(next_point_id_drone1, k)
                             next_point_id_drone2 = self.increment_point_id(next_point_id_drone2, k)
@@ -1536,10 +1617,48 @@ class MapAviary(ProjAviary):
         plt.show()
             
 ############ WAYPOINT FINE MISSIONE ################
-    def get_closest_node(self,
-                         drone_id):
-        """
-        trova il nodo più vicino da cui iniziare il tracciato
-        """
-
-        pass
+#
+#    def get_closest_node(self,
+#                         drone_id):
+#        """
+#        trova il nodo più vicino da cui iniziare il tracciato
+#        """
+#
+#        pass
+#
+#    def find_shortest_path(drone_id, start_node_id):
+#    # Dizionario per mantenere la distanza minima dai nodi di partenza
+#    distance = {node_id: float('inf') for node_id in drones_db[drone_id]}
+#    distance[start_node_id] = 0
+#
+#    # Coda di priorità per gestire i nodi da esplorare (min-heap)
+#    priority_queue = [(0, start_node_id)]  # (distanza, nodo)
+#
+#    # Dizionario per tracciare i predecessori dei nodi nel percorso più breve
+#    predecessors = {node_id: None for node_id in drones_db[drone_id]}
+#
+#    while priority_queue:
+#        current_distance, current_node_id = heapq.heappop(priority_queue)
+#
+#        if current_distance > distance[current_node_id]:
+#            continue
+#
+#        # Itera sui vicini del nodo corrente
+#        for neighbor_id, weight in adjacency_matrices[drone_id][current_node_id].items():
+#            distance_via_current = current_distance + weight
+#
+#            # Se trovato un percorso più breve verso il vicino, aggiorna la distanza e il predecessore
+#            if distance_via_current < distance[neighbor_id]:
+#                distance[neighbor_id] = distance_via_current
+#                predecessors[neighbor_id] = current_node_id
+#                heapq.heappush(priority_queue, (distance_via_current, neighbor_id))
+#
+#    # Ricostruisci il percorso dal nodo di partenza al nodo finale
+#    path = []
+#    current_node = end_node_id
+#    while current_node is not None:
+#        path.append(current_node)
+#        current_node = predecessors[current_node]
+#
+#    path.reverse()  # Inverti il percorso per avere l'ordine corretto da start a end
+#    return path
