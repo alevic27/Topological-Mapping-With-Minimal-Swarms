@@ -52,10 +52,11 @@ DEFAULT_CONTROL_VELOCITY: float = 0.2  #works with 0.2
 DEFAULT_WFSTATE : int = -1
 DEFAULT_THRESHOLD_DISTANCE : float = 0.03
 
+DEFAULT_MERGING_GRAPHS_LOGIC = True
+DEFAULT_MAX_DISTANCE_BETWEEN_NODES = 0.6 # 0.6 
+DEFAULT_EDGES_VISUALIZATION = True
+DEFAULT_SAME_DRONE_MERGING = True
 
-DEFAULT_MERGING_GRAPHS_LOGIC = False
-DEFAULT_EDGES_VISUALIZATION = False
-DEFAULT_SAME_DRONE_MERGING = False
 
 
 def run(
@@ -81,6 +82,7 @@ def run(
         merging_graphs=DEFAULT_MERGING_GRAPHS_LOGIC,
         edges_visualization=DEFAULT_EDGES_VISUALIZATION,
         self_merge=DEFAULT_SAME_DRONE_MERGING,
+        max_distance_between_nodes=DEFAULT_MAX_DISTANCE_BETWEEN_NODES,
         total_area_polygon=DEFAULT_MAP_POLYGON,
         point_coverage_radius=DEFAULT_POINT_COVERAGE_RADIUS,
         ):
@@ -147,6 +149,7 @@ def run(
                     merging_graphs=merging_graphs,
                     edges_visualization=edges_visualization,
                     self_merge=self_merge,
+                    max_distance_between_nodes=max_distance_between_nodes,
                     total_area_polygon=total_area_polygon,
                     point_coverage_radius=point_coverage_radius
                     )
