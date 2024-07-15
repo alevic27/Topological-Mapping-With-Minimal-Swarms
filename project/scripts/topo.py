@@ -25,7 +25,7 @@ DEFAULT_ACT = ActionType('one_d_rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' o
 DEFAULT_AGENTS = 2
 
 DEFAULT_DRONES = DroneModel("cf2x")
-DEFAULT_NUM_DRONES = 2
+DEFAULT_NUM_DRONES = 4
 DEFAULT_PHYSICS = Physics("pyb")
 DEFAULT_GUI = True
 DEFAULT_PLOT = True
@@ -56,6 +56,7 @@ DEFAULT_MERGING_GRAPHS_LOGIC = True
 DEFAULT_MAX_DISTANCE_BETWEEN_NODES = 0.6 # 0.6 
 DEFAULT_EDGES_VISUALIZATION = True
 DEFAULT_SAME_DRONE_MERGING = True
+
 
 
 def run(
@@ -92,15 +93,20 @@ def run(
         [-3.0, 0., 1.0]
     ])
     INIT_XYZS = np.array([
-         [-3.0, 0., 1.0],
-         [-3.5, 0., 1.0]
+         [-1.8, 0., 1.0],
+         [-2.0, 0., 1.0],
+         [-2.2, 0., 1.0],
+         [-2.5, 0., 1.0]
         ])
     INIT_RPYS = np.array([
         [0., 0., -0.5]
         ])
     INIT_RPYS = np.array([
-        [0., 0., -0.5],
-        [0., 0., +0.5]
+
+        [0., 0., 0.],
+        [0., 0., 0.],
+        [0., 0., 0.],
+        [0., 0., 0.]
         ])
 
     #INIT_XYZS = np.array([
@@ -177,7 +183,7 @@ def run(
         obs, observation, reward, terminated, truncated, info = env.step(action)
 
         #### Compute control for the current way point #############
-        TARGET_POS , TARGET_RPY , TARGET_VEL , TARGET_RPY_RATES = env.NextWP(obs,observation)       
+        TARGET_POS , TARGET_RPY , TARGET_VEL , TARGET_RPY_RATES = env.NextWP(obs,observation )       
 
         # velocity control PLACEHOLDER #TO BE IMPLEMENTED
         #TARGET_VEL , TARGET_RPY_RATES = env.NextWP_VEL(obs,observation) #
