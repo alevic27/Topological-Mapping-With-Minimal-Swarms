@@ -858,7 +858,7 @@ class MapAviary(ProjAviary):
 
     def merge_similar_points_same_drone(self,
                                         drone_id,
-                                        threshold=0.6):
+                                        threshold=0.58):
         """ confronto incrociato tra i nodi di 2 droni diversi e sostituisce con la media
         Parameters
         -------
@@ -915,11 +915,15 @@ class MapAviary(ProjAviary):
         for point_id, data in to_add:
             self.drones_db[drone_id][point_id] = data
             self.add_visual_ball(drone_id, point_id, data['coords'])
+        # un trio di nodi vicini generati da 
+        # vorrei qui un checker che dice che non ho aggiunto nodi troppo vicini tra loro
+        # potrei fare che se ne trova un trio vii
+
 
     def merge_similar_points_2_drones(self,
                                       drone1_id,
                                       drone2_id,
-                                      threshold=0.6):
+                                      threshold=0.58):
         """ confronto incrociato tra i nodi di 2 droni diversi e sostituisce con la media
         Parameters
         -------
