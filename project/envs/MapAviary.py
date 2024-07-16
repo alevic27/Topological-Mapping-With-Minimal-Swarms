@@ -1,6 +1,7 @@
 import numpy as np
 import pybullet as p
 import random 
+import heapq
 from gymnasium import spaces
 import pkg_resources
 from project.envs.ProjAviary import ProjAviary
@@ -1617,48 +1618,108 @@ class MapAviary(ProjAviary):
         plt.show()
             
 ############ WAYPOINT FINE MISSIONE ################
-#
-#    def get_closest_node(self,
-#                         drone_id):
-#        """
-#        trova il nodo più vicino da cui iniziare il tracciato
-#        """
-#
-#        pass
-#
-#    def find_shortest_path(drone_id, start_node_id):
-#    # Dizionario per mantenere la distanza minima dai nodi di partenza
-#    distance = {node_id: float('inf') for node_id in drones_db[drone_id]}
-#    distance[start_node_id] = 0
-#
-#    # Coda di priorità per gestire i nodi da esplorare (min-heap)
-#    priority_queue = [(0, start_node_id)]  # (distanza, nodo)
-#
-#    # Dizionario per tracciare i predecessori dei nodi nel percorso più breve
-#    predecessors = {node_id: None for node_id in drones_db[drone_id]}
-#
-#    while priority_queue:
-#        current_distance, current_node_id = heapq.heappop(priority_queue)
-#
-#        if current_distance > distance[current_node_id]:
-#            continue
-#
-#        # Itera sui vicini del nodo corrente
-#        for neighbor_id, weight in adjacency_matrices[drone_id][current_node_id].items():
-#            distance_via_current = current_distance + weight
-#
-#            # Se trovato un percorso più breve verso il vicino, aggiorna la distanza e il predecessore
-#            if distance_via_current < distance[neighbor_id]:
-#                distance[neighbor_id] = distance_via_current
-#                predecessors[neighbor_id] = current_node_id
-#                heapq.heappush(priority_queue, (distance_via_current, neighbor_id))
-#
-#    # Ricostruisci il percorso dal nodo di partenza al nodo finale
-#    path = []
-#    current_node = end_node_id
-#    while current_node is not None:
-#        path.append(current_node)
-#        current_node = predecessors[current_node]
-#
-#    path.reverse()  # Inverti il percorso per avere l'ordine corretto da start a end
-#    return path
+
+    def get_closest_node(self,
+                         drone_id):
+        """
+        trova il nodo più vicino da cui iniziare il tracciato
+
+        Parameters
+        ----------
+        drone_id : int
+            id del drone
+
+        Returns
+        ----------
+        str
+            L'ID del punto più vicino da cui partire per il ritorno
+        """
+        actual_position = self.pos[drone_id]
+        drone_points = self.drones_db[drone_id]
+        min_dist = np.inf
+        closest_point_id = []
+        for point_id, data in drone_points.items():
+            distance = self.euclidean_distance(actual_position,data['coords'])
+            if distance < min_dist:
+                min_dist = distance
+                closest_point_id = point_id
+        return closest_point_id
+
+    def dijkstra(self,
+                 drone_id,
+                 start_node):
+        """
+        Implementa l'algoritmo di Dijkstra per trovare il percorso più breve da start_node a tutti gli altri nodi.
+
+        Params:
+        drone_id : int
+            ID del drone.
+        start_node : str
+            ID del nodo di partenza 'start'
+
+        Returns:
+        dict
+            Distanze minime dal nodi di partenza a tutti gli altri nodi.
+        dict
+            Nodo precedente nel percorso più breve per ciascun nodo.
+        """
+        nodes = list(self.drones_db[drone_id].keys())
+        adjacency_matrix = self.adjacency_matrices[drone_id]
+        num_nodes = len(nodes)
+
+        visited = set()
+        distances = {node: float('inf') for node in nodes}
+        previous_nodes = {node: None for node in nodes}
+        distances[start_node] = 0
+
+        while len(visited) < num_nodes:
+            current_node = min((node for node in nodes if node not in visited), key=lambda node: distances[node])
+            visited.add(current_node)
+            #current_index = self.point_id_to_index(current_node)
+
+            for neighbor_index, weight in enumerate(adjacency_matrix[self.point_id_to_index(current_node)]):
+                neighbor_node = self.index_to_point_id(neighbor_index)
+                if weight > 0 and neighbor_node in nodes and neighbor_node not in visited:
+                    new_distance = distances[current_node] + weight
+                    if new_distance < distances[neighbor_node]:
+                        distances[neighbor_node] = new_distance
+                        previous_nodes[neighbor_node] = current_node
+
+        return distances, previous_nodes
+
+    def find_path_to_start(self,
+                           drone_id):
+        """
+        Trova il percorso più breve dal nodo più vicino alla posizione corrente del drone al nodo di partenza.
+
+        Params:
+        drone_id : int
+            ID del drone.
+
+        Returns:
+        list
+            Lista ordinata di nodi da raggiungere per tornare al nodo di partenza.
+        """
+        # Trova il nodo più vicino alla posizione corrente da cui partire
+        closest_node_id = self.get_closest_node(drone_id)
+
+        # Prende il nodo con il tag 'start'
+        start_node_id = None
+        for node_id, data in self.drones_db[drone_id].items():
+            if data['type'] == 'start':
+                start_node_id = node_id
+                break
+        if start_node_id is None:
+            raise ValueError(f"Start node not found for drone {drone_id}")
+
+        # Trova il path più veloce: closest node >>> start node
+        distances, previous_nodes = self.dijkstra(drone_id, start_node_id)
+
+        # Ricostruisce il percorso dal nodo più vicino al nodo di partenza
+        path = []
+        current_node = closest_node_id
+        while current_node is not None:
+            path.append(current_node)
+            current_node = previous_nodes[current_node]
+
+        return path
