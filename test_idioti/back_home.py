@@ -16,6 +16,9 @@ class DroneNavigation:
         self.drones_db = drones_db
         self.adjacency_matrices = adjacency_matrices
         self.pos = pos
+        self.returning_paths = {}
+        self.NUM_WP = np.array([[0] for i in range(1)])  # numero di WAYPOINTS del percorso di ritorno per ogni drone
+        self.wp_counters = np.array([[0] for i in range(1)])  # contatore del prossimo WAYPOINT DA RAGGIUNGERE
 
     def point_id_to_index(self, point_id:str):
         """
@@ -164,6 +167,44 @@ class DroneNavigation:
 
         return path
 
+    def returning_phase_paths_planning(self):
+        """
+        funzione che runna find_path_to_start per ogni drone nel momento in cui la missione
+        ha coperto un coverage sufficiente
+
+        updates
+        ------- 
+        self.returning_paths:
+            dizionario di liste, ognuna contiene l'elenco ordinato di id dei nodi del percorso di ritorno (WAYPOINTS)
+        self.NUM_WP :  ndarray (NUM_DRONES, 1)
+            numero di WAYPOINTS del percorso di ritorno per ogni drone
+        """
+        for drone_id in self.drones_db.keys():
+            path = self.find_path_to_start(drone_id)
+            self.returning_paths[drone_id] = path
+            self.NUM_WP[drone_id][0] = len(path)
+
+    def waypoint_nav(self,
+                     drone_id,
+                     wp_counter):
+        """
+        Parametres
+        --------
+        drone_id : int
+            L'ID del drone. 
+
+        Returns
+        --------
+        TARGET_POS : ndarray [float float float]
+            (3)-shaped array con la posizione del prossimo waypoint
+        TARGET_VEL : ndarray [float float float]
+            (3)-shaped array con la velocità desiderata
+        """
+        #wp_counter = self.wp_counters[drone_id][0]
+        waypoint_id = self.returning_paths[drone_id][wp_counter]
+        target_pos = np.array(self.drones_db[drone_id][waypoint_id]['coords'])
+        return target_pos
+
 # Example usage
 # Assuming self.drones_db and self.adjacency_matrices are already defined
 drones_db = {
@@ -200,4 +241,9 @@ pos = [[-0.2, 2., 1.], [0., 0., 0.]]
 
 navigation = DroneNavigation(drones_db, adjacency_matrices, pos)
 path = navigation.find_path_to_start(0)
+print(len(path))
 print(f"Path from the closest node to the current position to the 'start' node: {path}")
+navigation.returning_phase_paths_planning()
+wp_counter = 0
+target_pos = navigation.waypoint_nav(0,wp_counter)
+print(target_pos)

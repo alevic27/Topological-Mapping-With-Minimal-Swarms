@@ -154,6 +154,10 @@ class MapAviary(ProjAviary):
         self.point_coverage_radius = point_coverage_radius
         self.efficiency = 0 # appena il coverage_percent raggiunge il 90% viene salvato come valore temporale
         self.COVERAGE_IS_ENOUGH = False
+        self.BLOCK_SIMULATION_WHEN_RETURNING_PHASE_STARTS = False
+        self.returning_paths = {} # dizionario con i path di ritorno per tutti i droni
+        self.NUM_WP = np.array([[0] for i in range(num_drones)])  # numero di WAYPOINTS del percorso di ritorno per ogni drone
+        self.wp_counters = np.array([[0] for i in range(num_drones)])  # contatore del prossimo WAYPOINT DA RAGGIUNGERE
     ################################################################################
 
     def NextWP(self,obs,observation): #Aggiungere gli input necessari
@@ -169,7 +173,8 @@ class MapAviary(ProjAviary):
         TARGET_VEL = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
         TARGET_RPY_RATES = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
         #self.S_WF=self._decisionSystem()  # controllare se aggiornare in self o no
-        TARGET_OMEGA, RELATIVE_FRAME_VEL , self.WFSTATE , self.S_WF = self._WallFollowing3()
+        if self.COVERAGE_IS_ENOUGH == False:
+            TARGET_OMEGA, RELATIVE_FRAME_VEL , self.WFSTATE , self.S_WF = self._WallFollowing3()
 
         for i in range(self.NUM_DRONES) :
             if self.COVERAGE_IS_ENOUGH == False:
@@ -234,9 +239,10 @@ class MapAviary(ProjAviary):
                 TARGET_RPY_RATES[i][2] = TARGET_OMEGA[i]
             else:
             ########## WAYPOINT ########
-            # usando wp_counters e NUM_WP, restituiti da 
-                #TARGET_POS[i] = NEXT_WP
-
+                # usando wp_counters e NUM_WP, restituiti da 
+                    #TARGET_POS[i] = NEXT_WP
+                TARGET_POS[i] = self.waypoint_nav(i)
+                TARGET_VEL[i] = np.array([0.0, 0.0, 0.0])
                 pass
 
 
@@ -246,8 +252,56 @@ class MapAviary(ProjAviary):
         self.coverage_percent = self.calculate_coverage(self.point_coverage_radius)
         print(f"La percentuale di esplorazione è: {self.coverage_percent:.2f}%")
         return TARGET_POS, TARGET_RPY, TARGET_VEL, TARGET_RPY_RATES
-        
+
+    def waypoint_nav(self,
+                     drone_id):
+        """
+        Parametres
+        --------
+        drone_id : int
+            L'ID del drone. 
+
+        Returns
+        --------
+        TARGET_POS : ndarray [float float float]
+            (3)-shaped array con la posizione del prossimo waypoint
+        TARGET_VEL : ndarray [float float float]
+            (3)-shaped array con la velocità desiderata
+        """
+        if self.wp_counters[drone_id][0] == self.NUM_WP[drone_id][0]: # se ho raggiunto tutti i WAYPOINTS
+            target_pos = self.pos[drone_id]
+        else:
+            wp_counter = self.wp_counters[drone_id][0]
+            waypoint_id = self.returning_paths[drone_id][wp_counter] 
+            target_pos = np.array(self.drones_db[drone_id][waypoint_id]['coords'])
+            self.update_wp_counter(drone_id,target_pos)
+        return target_pos
+    
     ################################################################################
+
+    def update_wp_counter(self,
+                          drone_id,
+                          target_pos,
+                          threshold=0.2): # TODO:tuning
+        """
+        Aggiorna il contatore dei waypoint per il drone specificato se il drone ha raggiunto il waypoint attuale.
+
+        Parameters
+        ----------
+        drone_id : int
+            L'ID del drone.
+        threshold : float
+            La distanza soglia per considerare il waypoint come raggiunto.
+
+        Returns
+        -------
+        None
+        """
+        current_pos = self.pos[drone_id]
+        distance = self.euclidean_distance(current_pos, target_pos)
+        
+        if distance < threshold:
+            self.wp_counters[drone_id][0] += 1
 
     def _decisionSystem(self): #Aggiungere gli input necessari
         """Definisce la logica di scelta della direzione da prendere dopo uno stop (dopo che becca muro)
@@ -260,7 +314,6 @@ class MapAviary(ProjAviary):
 
     def _WallFollowing3(self):    #ALG B.1
         """Funzione per seguire in modo allineato il muro -> tira fuori la rotazione desiderata da mandare ai controlli
-        ### REMAKE DEL 2 sfruttando il movimento laterale
         
         Parameters (non input ma nel self)
         ---------
@@ -272,6 +325,7 @@ class MapAviary(ProjAviary):
         - WFstate = 3 stato transitorio di uscita da 2 , piccolo avanzamento lineare per non perdere subito rR o rL
         - WFstate = 4 stato di debug di 0 quando vi si entra in situazioni troppo vicine o troppo lontane al muro #TODO: da sviluppare
                 per ora il debug è interno a WFstate = 0
+
         Returns
         --------
         omega: ndarray - [[float] for j in range(self.NUM_DRONES)]
@@ -1562,10 +1616,11 @@ class MapAviary(ProjAviary):
         if coverage_percent >= self.TARGET_COVERAGE and self.COVERAGE_IS_ENOUGH == False:
             self.efficiency = self.step_counter*self.PYB_TIMESTEP
             self.COVERAGE_IS_ENOUGH = True
-            self.plot_coverage() #TODO: vedere come deve esssere l'input EVALUATOR
+            self.plot_coverage(self.total_area_polygon, radius) #TODO: vedere come deve esssere l'input EVALUATOR
+            self.returning_phase_paths_planning()
         return coverage_percent
 
-    def plot_coverage(self, evaluator, radius):
+    def plot_coverage(self, total_area_polygon, radius):
         """
         Visualizza l'area coperta dai droni all'interno del labirinto.
 
@@ -1583,15 +1638,15 @@ class MapAviary(ProjAviary):
         fig, ax = plt.subplots()
 
         # Traccia l'area totale del labirinto
-        rotated_total_area = rotate(evaluator.total_area_polygon, 90, origin=(0, 0))
+        rotated_total_area = rotate(total_area_polygon, 90, origin=(0, 0))
         x, y = rotated_total_area.exterior.xy
         ax.plot(x, y, label='Total Area')
 
-        for drone_id, points in evaluator.drones_db.items():
+        for drone_id, points in self.drones_db.items():
             for point_id, data in points.items():
                 coords = data['coords']
                 point = Point(coords[0], coords[1])
-                buffer = point.buffer(radius).intersection(evaluator.total_area_polygon)
+                buffer = point.buffer(radius).intersection(total_area_polygon)
                 rotated_buffer = rotate(buffer, 90, origin=(0, 0))
                 if rotated_buffer.geom_type == 'Polygon':
                     x, y = rotated_buffer.exterior.xy
@@ -1615,7 +1670,7 @@ class MapAviary(ProjAviary):
         ax.set_xticks(xticks)
         ax.set_xticklabels([f'{int(label):.0f}' for label in xticks[::-1]])
         #plt.legend()
-        plt.show()
+        plt.show(block=self.BLOCK_SIMULATION_WHEN_RETURNING_PHASE_STARTS)
             
 ############ WAYPOINT FINE MISSIONE ################
 
@@ -1723,3 +1778,20 @@ class MapAviary(ProjAviary):
             current_node = previous_nodes[current_node]
 
         return path
+    
+    def returning_phase_paths_planning(self):
+        """
+        funzione che runna find_path_to_start per ogni drone nel momento in cui la missione
+        ha coperto un coverage sufficiente
+
+        updates
+        ------- 
+        self.returning_paths:
+            dizionario di liste, ognuna contiene l'elenco ordinato di id dei nodi del percorso di ritorno (WAYPOINTS)
+        self.NUM_WP :  ndarray (NUM_DRONES, 1)
+            numero di WAYPOINTS del percorso di ritorno per ogni drone
+        """
+        for drone_id in self.drones_db.keys():
+            path = self.find_path_to_start(drone_id)
+            self.returning_paths[drone_id] = path
+            self.NUM_WP[drone_id][0] = len(path)
