@@ -11,6 +11,7 @@ from shapely.ops import unary_union
 
 from gym_pybullet_drones.utils.Logger import Logger
 from project.envs.MapAviary import MapAviary
+from project.assets.assets_list import Labyrinth, LABYRINTH_CONFIG
 from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
 from gym_pybullet_drones.utils.utils import sync, str2bool
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType
@@ -25,7 +26,7 @@ DEFAULT_ACT = ActionType('one_d_rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' o
 DEFAULT_AGENTS = 2
 
 DEFAULT_DRONES = DroneModel("cf2x")
-DEFAULT_NUM_DRONES = 2
+DEFAULT_NUM_DRONES = 4
 DEFAULT_PHYSICS = Physics("pyb")
 DEFAULT_GUI = True
 DEFAULT_PLOT = True
@@ -37,14 +38,21 @@ DEFAULT_IMG_RES = np.array([64, 48])
 
 DEFAULT_SENSORS_ATTRIBUTES = True
 DEFAULT_SENSORS_RANGE = 4.
-DEFAULT_REF_DISTANCE = 0.75
-DEFAULT_LABYRINTH_ID = "2t"  # "0" per i 4 oggettini di BaseRLAviary, "lettera" della versione del labirinto 
-DEFAULT_MAP_POLYGON = Polygon([(3., 0.), (1., 0.),(1., 3.1),(2.9, 3.1),(2.9 , 4.9),(-2.9 , 4.9),(-2.9 , 3.1),
-                                (-1, 3.1), (-1, -3.1),(-2.9, -3.1),(-2.9, -4.9),(2.9, -4.9),
-                                (2.9 , -3.1),(1., -3.1),(1., -1.0),(3., -1.)])
+
+##### SCELTA LABIRINTO tra:
+# DOUBLE_T
+# DOUBLE_T_2X
+DEFAULT_LABYRINTH_ID = Labyrinth.DOUBLE_T #modificare solo questa riga
+# Configurazione del labirinto selezionato
+selected_config = LABYRINTH_CONFIG[DEFAULT_LABYRINTH_ID]
+DEFAULT_MAP_POLYGON = selected_config["polygon"]
 new_coords = [(-x, -y) for x, y in DEFAULT_MAP_POLYGON.exterior.coords]
 DEFAULT_MAP_POLYGON = Polygon(new_coords)
+STARTING_COORDS_OFFSET = selected_config["starting_coords_offset"]
+
+DEFAULT_REF_DISTANCE = 0.75
 DEFAULT_POINT_COVERAGE_RADIUS = 0.75 # con 0.75 raggiunge al massimo 70% coverage
+DEFAULT_TARGET_COVERAGE_PERCENT = 30
 
 DEFAULT_S_WF: int = +1   #wallfollowing side
 DEFAULT_CONTROL_OMEGA : float = 0.5  #works with 0.5
@@ -52,9 +60,11 @@ DEFAULT_CONTROL_VELOCITY: float = 0.2  #works with 0.2
 DEFAULT_WFSTATE : int = -1
 DEFAULT_THRESHOLD_DISTANCE : float = 0.03
 
-DEFAULT_MERGING_GRAPHS_LOGIC = True
-DEFAULT_EDGES_VISUALIZATION = True
-DEFAULT_SAME_DRONE_MERGING = True
+DEFAULT_MERGING_GRAPHS_LOGIC = False
+DEFAULT_MAX_DISTANCE_BETWEEN_NODES = 0.6 # 0.6 
+DEFAULT_EDGES_VISUALIZATION = False
+DEFAULT_SAME_DRONE_MERGING = False
+
 
 
 def run(
@@ -80,8 +90,10 @@ def run(
         merging_graphs=DEFAULT_MERGING_GRAPHS_LOGIC,
         edges_visualization=DEFAULT_EDGES_VISUALIZATION,
         self_merge=DEFAULT_SAME_DRONE_MERGING,
+        max_distance_between_nodes=DEFAULT_MAX_DISTANCE_BETWEEN_NODES,
         total_area_polygon=DEFAULT_MAP_POLYGON,
         point_coverage_radius=DEFAULT_POINT_COVERAGE_RADIUS,
+        target_coverage=DEFAULT_TARGET_COVERAGE_PERCENT,
         ):
     
     ### definisci le posizioni iniziali dei droni
@@ -90,15 +102,20 @@ def run(
         [-3.0, 0., 1.0]
     ])
     INIT_XYZS = np.array([
-         [-3.0, 0., 1.0],
-         [-3.5, 0., 1.0]
+         [-1.5, 0., 1.0],
+         [-1.8, 0., 1.0],
+         [-2.0, 0., 1.0],
+         [-2.3, 0., 1.0]
         ])
+    INIT_XYZS += STARTING_COORDS_OFFSET
     INIT_RPYS = np.array([
         [0., 0., -0.5]
         ])
     INIT_RPYS = np.array([
-        [0., 0., -0.5],
-        [0., 0., +0.5]
+        [0., 0., 0.],
+        [0., 0., 0.],
+        [0., 0., 0.],
+        [0., 0., 0.]
         ])
 
     #INIT_XYZS = np.array([
@@ -142,8 +159,10 @@ def run(
                     merging_graphs=merging_graphs,
                     edges_visualization=edges_visualization,
                     self_merge=self_merge,
+                    max_distance_between_nodes=max_distance_between_nodes,
                     total_area_polygon=total_area_polygon,
-                    point_coverage_radius=point_coverage_radius
+                    point_coverage_radius=point_coverage_radius,
+                    target_coverage=target_coverage,
                     )
     
     #### Initialize the controllers ############################
@@ -174,7 +193,7 @@ def run(
         obs, observation, reward, terminated, truncated, info = env.step(action)
 
         #### Compute control for the current way point #############
-        TARGET_POS , TARGET_RPY , TARGET_VEL , TARGET_RPY_RATES = env.NextWP(obs,observation)       
+        TARGET_POS , TARGET_RPY , TARGET_VEL , TARGET_RPY_RATES = env.NextWP(obs,observation )       
 
         # velocity control PLACEHOLDER #TO BE IMPLEMENTED
         #TARGET_VEL , TARGET_RPY_RATES = env.NextWP_VEL(obs,observation) #

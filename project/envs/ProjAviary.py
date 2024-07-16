@@ -177,7 +177,7 @@ class ProjAviary(CtrlAviary):
                            physicsClientId=self.CLIENT
                            )
         else:
-            p.loadURDF(pkg_resources.resource_filename('project','assets/'+'labyr'+self.LABYRINTH_ID+'.urdf'),
+            p.loadURDF(pkg_resources.resource_filename('project','assets/'+'labyr'+self.LABYRINTH_ID.value+'.urdf'),
                        [0, 0, 0],
                        #p.getQuaternionFromEuler([0,0,0]),
                        p.getQuaternionFromEuler([0,0,np.pi]),  # PROBLEMA : creare urdf con blender decide lui le posizioni e le direzioni quindi tocca inizializzare ogni singolo asset in qualche modo
