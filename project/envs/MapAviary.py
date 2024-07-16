@@ -1,6 +1,7 @@
 import numpy as np
 import pybullet as p
 import random 
+import heapq
 from gymnasium import spaces
 import pkg_resources
 from project.envs.ProjAviary import ProjAviary
@@ -153,6 +154,10 @@ class MapAviary(ProjAviary):
         self.point_coverage_radius = point_coverage_radius
         self.efficiency = 0 # appena il coverage_percent raggiunge il 90% viene salvato come valore temporale
         self.COVERAGE_IS_ENOUGH = False
+        self.BLOCK_SIMULATION_WHEN_RETURNING_PHASE_STARTS = False
+        self.returning_paths = {} # dizionario con i path di ritorno per tutti i droni
+        self.NUM_WP = np.array([[0] for i in range(num_drones)])  # numero di WAYPOINTS del percorso di ritorno per ogni drone
+        self.wp_counters = np.array([[0] for i in range(num_drones)])  # contatore del prossimo WAYPOINT DA RAGGIUNGERE
     ################################################################################
 
     def NextWP(self,obs,observation): #Aggiungere gli input necessari
@@ -168,7 +173,10 @@ class MapAviary(ProjAviary):
         TARGET_VEL = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
         TARGET_RPY_RATES = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
         #self.S_WF=self._decisionSystem()  # controllare se aggiornare in self o no
-        TARGET_OMEGA, RELATIVE_FRAME_VEL , self.WFSTATE , self.S_WF, droni_nelle_vicinanze = self._WallFollowing3()
+
+
+        if self.COVERAGE_IS_ENOUGH == False:
+            TARGET_OMEGA, RELATIVE_FRAME_VEL , self.WFSTATE , self.S_WF, droni_nelle_vicinanze = self._WallFollowing3()
 
         for i in range(self.NUM_DRONES) :
             if self.COVERAGE_IS_ENOUGH == False:  
@@ -255,12 +263,13 @@ class MapAviary(ProjAviary):
                 TARGET_RPY_RATES[i][1] = 0.
                 TARGET_RPY_RATES[i][2] = TARGET_OMEGA[i]
             else:
-                    ########## WAYPOINT ########
-                    # usando wp_counters e NUM_WP, restituiti da 
-                        #TARGET_POS[i] = NEXT_WP
 
-                        pass
-
+            ########## WAYPOINT ########
+                # usando wp_counters e NUM_WP, restituiti da 
+                    #TARGET_POS[i] = NEXT_WP
+                TARGET_POS[i] = self.waypoint_nav(i)
+                TARGET_VEL[i] = np.array([0.0, 0.0, 0.0])
+                pass
 
         for j in range(self.NUM_DRONES) : # saves actual mindist to distance[0]. It will be the prev_dist of next step
             self.distance[j][0] =  self.distance[j][1]
@@ -268,8 +277,56 @@ class MapAviary(ProjAviary):
         self.coverage_percent = self.calculate_coverage(self.point_coverage_radius)
         print(f"La percentuale di esplorazione è: {self.coverage_percent:.2f}%")
         return TARGET_POS, TARGET_RPY, TARGET_VEL, TARGET_RPY_RATES
-        
+
+    def waypoint_nav(self,
+                     drone_id):
+        """
+        Parametres
+        --------
+        drone_id : int
+            L'ID del drone. 
+
+        Returns
+        --------
+        TARGET_POS : ndarray [float float float]
+            (3)-shaped array con la posizione del prossimo waypoint
+        TARGET_VEL : ndarray [float float float]
+            (3)-shaped array con la velocità desiderata
+        """
+        if self.wp_counters[drone_id][0] == self.NUM_WP[drone_id][0]: # se ho raggiunto tutti i WAYPOINTS
+            target_pos = self.pos[drone_id]
+        else:
+            wp_counter = self.wp_counters[drone_id][0]
+            waypoint_id = self.returning_paths[drone_id][wp_counter] 
+            target_pos = np.array(self.drones_db[drone_id][waypoint_id]['coords'])
+            self.update_wp_counter(drone_id,target_pos)
+        return target_pos
+    
     ################################################################################
+
+    def update_wp_counter(self,
+                          drone_id,
+                          target_pos,
+                          threshold=0.2): # TODO:tuning
+        """
+        Aggiorna il contatore dei waypoint per il drone specificato se il drone ha raggiunto il waypoint attuale.
+
+        Parameters
+        ----------
+        drone_id : int
+            L'ID del drone.
+        threshold : float
+            La distanza soglia per considerare il waypoint come raggiunto.
+
+        Returns
+        -------
+        None
+        """
+        current_pos = self.pos[drone_id]
+        distance = self.euclidean_distance(current_pos, target_pos)
+        
+        if distance < threshold:
+            self.wp_counters[drone_id][0] += 1
 
     def _decisionSystem(self): #Aggiungere gli input necessari
         """Definisce la logica di scelta della direzione da prendere dopo uno stop (dopo che becca muro)
@@ -283,7 +340,6 @@ class MapAviary(ProjAviary):
 
     def _WallFollowing3(self):    #ALG B.1
         """Funzione per seguire in modo allineato il muro -> tira fuori la rotazione desiderata da mandare ai controlli
-        ### REMAKE DEL 2 sfruttando il movimento laterale
         
         Parameters (non input ma nel self)
         ---------
@@ -295,6 +351,7 @@ class MapAviary(ProjAviary):
         - WFstate = 3 stato transitorio di uscita da 2 , piccolo avanzamento lineare per non perdere subito rR o rL
         - WFstate = 4 stato di debug di 0 quando vi si entra in situazioni troppo vicine o troppo lontane al muro #TODO: da sviluppare
                 per ora il debug è interno a WFstate = 0
+
         Returns
         --------
         omega: ndarray - [[float] for j in range(self.NUM_DRONES)]
@@ -1630,10 +1687,11 @@ class MapAviary(ProjAviary):
         if coverage_percent >= self.TARGET_COVERAGE and self.COVERAGE_IS_ENOUGH == False:
             self.efficiency = self.step_counter*self.PYB_TIMESTEP
             self.COVERAGE_IS_ENOUGH = True
-            self.plot_coverage() #TODO: vedere come deve esssere l'input EVALUATOR
+            self.plot_coverage(self.total_area_polygon, radius) #TODO: vedere come deve esssere l'input EVALUATOR
+            self.returning_phase_paths_planning()
         return coverage_percent
 
-    def plot_coverage(self, evaluator, radius):
+    def plot_coverage(self, total_area_polygon, radius):
         """
         Visualizza l'area coperta dai droni all'interno del labirinto.
 
@@ -1651,15 +1709,15 @@ class MapAviary(ProjAviary):
         fig, ax = plt.subplots()
 
         # Traccia l'area totale del labirinto
-        rotated_total_area = rotate(evaluator.total_area_polygon, 90, origin=(0, 0))
+        rotated_total_area = rotate(total_area_polygon, 90, origin=(0, 0))
         x, y = rotated_total_area.exterior.xy
         ax.plot(x, y, label='Total Area')
 
-        for drone_id, points in evaluator.drones_db.items():
+        for drone_id, points in self.drones_db.items():
             for point_id, data in points.items():
                 coords = data['coords']
                 point = Point(coords[0], coords[1])
-                buffer = point.buffer(radius).intersection(evaluator.total_area_polygon)
+                buffer = point.buffer(radius).intersection(total_area_polygon)
                 rotated_buffer = rotate(buffer, 90, origin=(0, 0))
                 if rotated_buffer.geom_type == 'Polygon':
                     x, y = rotated_buffer.exterior.xy
@@ -1683,51 +1741,128 @@ class MapAviary(ProjAviary):
         ax.set_xticks(xticks)
         ax.set_xticklabels([f'{int(label):.0f}' for label in xticks[::-1]])
         #plt.legend()
-        plt.show()
+        plt.show(block=self.BLOCK_SIMULATION_WHEN_RETURNING_PHASE_STARTS)
             
 ############ WAYPOINT FINE MISSIONE ################
-#
-#    def get_closest_node(self,
-#                         drone_id):
-#        """
-#        trova il nodo più vicino da cui iniziare il tracciato
-#        """
-#
-#        pass
-#
-#    def find_shortest_path(drone_id, start_node_id):
-#    # Dizionario per mantenere la distanza minima dai nodi di partenza
-#    distance = {node_id: float('inf') for node_id in drones_db[drone_id]}
-#    distance[start_node_id] = 0
-#
-#    # Coda di priorità per gestire i nodi da esplorare (min-heap)
-#    priority_queue = [(0, start_node_id)]  # (distanza, nodo)
-#
-#    # Dizionario per tracciare i predecessori dei nodi nel percorso più breve
-#    predecessors = {node_id: None for node_id in drones_db[drone_id]}
-#
-#    while priority_queue:
-#        current_distance, current_node_id = heapq.heappop(priority_queue)
-#
-#        if current_distance > distance[current_node_id]:
-#            continue
-#
-#        # Itera sui vicini del nodo corrente
-#        for neighbor_id, weight in adjacency_matrices[drone_id][current_node_id].items():
-#            distance_via_current = current_distance + weight
-#
-#            # Se trovato un percorso più breve verso il vicino, aggiorna la distanza e il predecessore
-#            if distance_via_current < distance[neighbor_id]:
-#                distance[neighbor_id] = distance_via_current
-#                predecessors[neighbor_id] = current_node_id
-#                heapq.heappush(priority_queue, (distance_via_current, neighbor_id))
-#
-#    # Ricostruisci il percorso dal nodo di partenza al nodo finale
-#    path = []
-#    current_node = end_node_id
-#    while current_node is not None:
-#        path.append(current_node)
-#        current_node = predecessors[current_node]
-#
-#    path.reverse()  # Inverti il percorso per avere l'ordine corretto da start a end
-#    return path
+
+    def get_closest_node(self,
+                         drone_id):
+        """
+        trova il nodo più vicino da cui iniziare il tracciato
+
+        Parameters
+        ----------
+        drone_id : int
+            id del drone
+
+        Returns
+        ----------
+        str
+            L'ID del punto più vicino da cui partire per il ritorno
+        """
+        actual_position = self.pos[drone_id]
+        drone_points = self.drones_db[drone_id]
+        min_dist = np.inf
+        closest_point_id = []
+        for point_id, data in drone_points.items():
+            distance = self.euclidean_distance(actual_position,data['coords'])
+            if distance < min_dist:
+                min_dist = distance
+                closest_point_id = point_id
+        return closest_point_id
+
+    def dijkstra(self,
+                 drone_id,
+                 start_node):
+        """
+        Implementa l'algoritmo di Dijkstra per trovare il percorso più breve da start_node a tutti gli altri nodi.
+
+        Params:
+        drone_id : int
+            ID del drone.
+        start_node : str
+            ID del nodo di partenza 'start'
+
+        Returns:
+        dict
+            Distanze minime dal nodi di partenza a tutti gli altri nodi.
+        dict
+            Nodo precedente nel percorso più breve per ciascun nodo.
+        """
+        nodes = list(self.drones_db[drone_id].keys())
+        adjacency_matrix = self.adjacency_matrices[drone_id]
+        num_nodes = len(nodes)
+
+        visited = set()
+        distances = {node: float('inf') for node in nodes}
+        previous_nodes = {node: None for node in nodes}
+        distances[start_node] = 0
+
+        while len(visited) < num_nodes:
+            current_node = min((node for node in nodes if node not in visited), key=lambda node: distances[node])
+            visited.add(current_node)
+            #current_index = self.point_id_to_index(current_node)
+
+            for neighbor_index, weight in enumerate(adjacency_matrix[self.point_id_to_index(current_node)]):
+                neighbor_node = self.index_to_point_id(neighbor_index)
+                if weight > 0 and neighbor_node in nodes and neighbor_node not in visited:
+                    new_distance = distances[current_node] + weight
+                    if new_distance < distances[neighbor_node]:
+                        distances[neighbor_node] = new_distance
+                        previous_nodes[neighbor_node] = current_node
+
+        return distances, previous_nodes
+
+    def find_path_to_start(self,
+                           drone_id):
+        """
+        Trova il percorso più breve dal nodo più vicino alla posizione corrente del drone al nodo di partenza.
+
+        Params:
+        drone_id : int
+            ID del drone.
+
+        Returns:
+        list
+            Lista ordinata di nodi da raggiungere per tornare al nodo di partenza.
+        """
+        # Trova il nodo più vicino alla posizione corrente da cui partire
+        closest_node_id = self.get_closest_node(drone_id)
+
+        # Prende il nodo con il tag 'start'
+        start_node_id = None
+        for node_id, data in self.drones_db[drone_id].items():
+            if data['type'] == 'start':
+                start_node_id = node_id
+                break
+        if start_node_id is None:
+            raise ValueError(f"Start node not found for drone {drone_id}")
+
+        # Trova il path più veloce: closest node >>> start node
+        distances, previous_nodes = self.dijkstra(drone_id, start_node_id)
+
+        # Ricostruisce il percorso dal nodo più vicino al nodo di partenza
+        path = []
+        current_node = closest_node_id
+        while current_node is not None:
+            path.append(current_node)
+            current_node = previous_nodes[current_node]
+
+        return path
+    
+    def returning_phase_paths_planning(self):
+        """
+        funzione che runna find_path_to_start per ogni drone nel momento in cui la missione
+        ha coperto un coverage sufficiente
+
+        updates
+        ------- 
+        self.returning_paths:
+            dizionario di liste, ognuna contiene l'elenco ordinato di id dei nodi del percorso di ritorno (WAYPOINTS)
+        self.NUM_WP :  ndarray (NUM_DRONES, 1)
+            numero di WAYPOINTS del percorso di ritorno per ogni drone
+        """
+        for drone_id in self.drones_db.keys():
+            path = self.find_path_to_start(drone_id)
+            self.returning_paths[drone_id] = path
+            self.NUM_WP[drone_id][0] = len(path)

@@ -47,7 +47,7 @@ class DroneMissionEvaluator:
         coverage_percent = (covered_area / self.total_area_polygon.area) * 100
         return coverage_percent
 
-    def plot_coverage(self, evaluator, radius):
+    def plot_coverage(self, total_area_polygon, radius):
         """
         Visualizza l'area coperta dai droni all'interno del labirinto.
 
@@ -65,15 +65,15 @@ class DroneMissionEvaluator:
         fig, ax = plt.subplots()
 
         # Traccia l'area totale del labirinto
-        rotated_total_area = rotate(evaluator.total_area_polygon, 90, origin=(0, 0))
+        rotated_total_area = rotate(total_area_polygon, 90, origin=(0, 0))
         x, y = rotated_total_area.exterior.xy
         ax.plot(x, y, label='Total Area')
 
-        for drone_id, points in evaluator.drones_db.items():
+        for drone_id, points in self.drones_db.items():
             for point_id, data in points.items():
                 coords = data['coords']
                 point = Point(coords[0], coords[1])
-                buffer = point.buffer(radius).intersection(evaluator.total_area_polygon)
+                buffer = point.buffer(radius).intersection(total_area_polygon)
                 rotated_buffer = rotate(buffer, 90, origin=(0, 0))
                 if rotated_buffer.geom_type == 'Polygon':
                     x, y = rotated_buffer.exterior.xy
@@ -106,9 +106,9 @@ class DroneMissionEvaluator:
 total_area_polygon = Polygon([(3.0, 1.0), (1.0, 1.0), (1.0, 3.1), (2.9, 3.1), (2.9 , 4.9), (-2.9 , 4.9),
                               (-2.9 , 3.1), (-1, 3.1), (-1, -3.1),(-2.9, -3.1),(-2.9, -4.9),(2.9, -4.9),
                                 (2.9 , -3.1),(1., -3.1),(1., -1.0),(3., -1.)])
-total_area_polygon = Polygon([(6.0, 0.0), (2.0, 0.0), (2.0, 6.2), (5.8, 6.2), (5.8, 9.8), (-5.8, 9.8), (-5.8, 6.2),
-                            (-2.0, 6.2), (-2.0, -6.2), (-5.8, -6.2), (-5.8, -9.8), (5.8, -9.8), (5.8, -6.2),
-                            (2.0, -6.2), (2.0, -2.0), (6.0, -2.0)])
+#total_area_polygon = Polygon([(6.0, 0.0), (2.0, 0.0), (2.0, 6.2), (5.8, 6.2), (5.8, 9.8), (-5.8, 9.8), (-5.8, 6.2),
+#                            (-2.0, 6.2), (-2.0, -6.2), (-5.8, -6.2), (-5.8, -9.8), (5.8, -9.8), (5.8, -6.2),
+#                            (2.0, -6.2), (2.0, -2.0), (6.0, -2.0)])
 new_coords = [(-x, -y) for x, y in total_area_polygon.exterior.coords]
 total_area_polygon = Polygon(new_coords)
 print("l'area totale è: ",total_area_polygon.area)
@@ -128,4 +128,4 @@ env.drones_db = {
 coverage = env.calculate_coverage(radius=0.75)
 print(f"Coverage Percent: {coverage}%")
 print(type(env))
-env.plot_coverage(env, radius=0.75)
+env.plot_coverage(total_area_polygon, radius=0.75)
