@@ -60,10 +60,10 @@ DEFAULT_CONTROL_VELOCITY: float = 0.2  #works with 0.2
 DEFAULT_WFSTATE : int = -1
 DEFAULT_THRESHOLD_DISTANCE : float = 0.03
 
-DEFAULT_MERGING_GRAPHS_LOGIC = True
+DEFAULT_MERGING_GRAPHS_LOGIC = False
 DEFAULT_MAX_DISTANCE_BETWEEN_NODES = 0.6 # 0.6 
-DEFAULT_EDGES_VISUALIZATION = True
-DEFAULT_SAME_DRONE_MERGING = True
+DEFAULT_EDGES_VISUALIZATION = False
+DEFAULT_SAME_DRONE_MERGING = False
 
 
 
@@ -102,17 +102,16 @@ def run(
         [-3.0, 0., 1.0]
     ])
     INIT_XYZS = np.array([
+         [-1.5, 0., 1.0],
          [-1.8, 0., 1.0],
          [-2.0, 0., 1.0],
-         [-2.2, 0., 1.0],
-         [-2.5, 0., 1.0]
+         [-2.3, 0., 1.0]
         ])
     INIT_XYZS += STARTING_COORDS_OFFSET
     INIT_RPYS = np.array([
         [0., 0., -0.5]
         ])
     INIT_RPYS = np.array([
-
         [0., 0., 0.],
         [0., 0., 0.],
         [0., 0., 0.],
