@@ -52,7 +52,7 @@ STARTING_COORDS_OFFSET = selected_config["starting_coords_offset"]
 
 DEFAULT_REF_DISTANCE = 0.75
 DEFAULT_POINT_COVERAGE_RADIUS = 0.75 # con 0.75 raggiunge al massimo 70% coverage
-DEFAULT_TARGET_COVERAGE_PERCENT = 30
+DEFAULT_TARGET_COVERAGE_PERCENT = 98
 
 DEFAULT_S_WF: int = +1   #wallfollowing side
 DEFAULT_CONTROL_OMEGA : float = 0.5  #works with 0.5
