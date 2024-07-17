@@ -5,16 +5,21 @@ import bmesh
 bpy.ops.object.mode_set(mode='OBJECT')
 obj = bpy.context.active_object
 
+print("new_line")
+
 # Assicurati che l'oggetto selezionato sia una mesh
 if obj and obj.type == 'MESH':
     # Crea una rappresentazione BMesh dell'oggetto
     bm = bmesh.new()
     bm.from_mesh(obj.data)
     
-    # Itera su tutti gli spigoli della mesh
-    for edge in bm.edges:
-        v1, v2 = edge.verts
-        print(f"Edge from {v1.co} to {v2.co}")
+    # Ottieni la matrice di trasformazione dell'oggetto
+    matrix_world = obj.matrix_world
+    
+    # Itera su tutti i vertici della mesh
+    for vert in bm.verts:
+        global_coord = matrix_world @ vert.co
+        print(f"Vertex at {global_coord}")
 
     # Libera la memoria usata dal BMesh
     bm.free()
