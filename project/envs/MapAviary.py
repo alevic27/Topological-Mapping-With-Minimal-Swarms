@@ -375,7 +375,7 @@ class MapAviary(ProjAviary):
         else:
             sWF = random.choice([-1,1])
         print("scelta randomica",sWF)
-        return sWF
+        return sWF 
     
     ################################################################################
 
@@ -524,7 +524,7 @@ class MapAviary(ProjAviary):
                                 print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo")
                         if np.abs(self.prev_rR[i][0] - rR) > 1.5*self.td : #condizione con la storia di rR
                             turn_direction = self._decisionSystem(i)
-                            if  turn_direction == self.S_WF[i][0] and self.MOVE_FORWARD[i][0] == False:
+                            if  turn_direction == -1 and self.MOVE_FORWARD[i][0] == False:
                                 self._SwitchWFSTATE(i, 2) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
                                 print("esco da WFSTATE = 1 e entro in WFSTATE = 2")
                             elif self.MOVE_FORWARD[i][0] == False or self.state1counter[i][0]>120 : 
@@ -537,10 +537,10 @@ class MapAviary(ProjAviary):
                                 print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo")
                         if np.abs(self.prev_rL[i][0] - rL) > 1.5*self.td : #condizione con la storia di rR
                             turn_direction = self._decisionSystem(i)
-                            if  turn_direction == self.S_WF[i][0] and self.MOVE_FORWARD[i][0] == False:
+                            if  turn_direction ==1 and self.MOVE_FORWARD[i][0] == False:
                                 self._SwitchWFSTATE(i, 2) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
                                 print("esco da WFSTATE = 1 e entro in WFSTATE = 2")
-                            elif self.MOVE_FORWARD[i][0] == False :
+                            elif self.MOVE_FORWARD[i][0] == False or self.state1counter[i][0]>120 :
                                 self._SwitchWFSTATE(i, 4) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
                                 print("esco da WFSTATE = 1 e entro in WFSTATE = 4")
                 ###### Topological
@@ -659,7 +659,7 @@ class MapAviary(ProjAviary):
                     omega[i] = ([0])
                     if  len(superiors) == 0:
                         self.state5counter[i][0] += 1
-                        if self.state5counter[i][0] > 150 :
+                        if self.state5counter[i][0] > 100 :
                             self._SwitchWFSTATE(i, 6)
         ######################  STATO 6 : USCITA DAL COLLISION AVOIDANCE  ############################
             elif self.WFSTATE[i][0] == 6:
