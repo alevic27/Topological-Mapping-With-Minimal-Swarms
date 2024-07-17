@@ -581,7 +581,7 @@ class MapAviary(ProjAviary):
                         print("la differenza tra il range destro attuale e precedente è:", np.abs(rR - self.prev_rR[i][0]) )
                         print("la tolleranza per passare a 3 è", self.td*0.0015)
                         if self.prev_rR[i][0] != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.001:
-                            self._SwitchWFSTATE(i, 3)
+                            self._SwitchWFSTATE(i, 0)
                             print("esco da WFSTATE = 2 e entro in WFSTATE = 3 poichè sono abbastanza allineato col muro")
                         if np.abs(rR - self.prev_rR[i][0]) > 0.5 or rR == self.MAX_RANGE:
                            self._SwitchWFSTATE(i, 3)
@@ -590,7 +590,7 @@ class MapAviary(ProjAviary):
                     elif self.S_WF[i][0] == -1: # wallfollowing con muro a sinistra
                         print("la differenza tra il range sinistro attuale e precedente è:", np.abs(rL - self.prev_rL[i][0]) )
                         if self.prev_rL[i][0] != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.001 : # 0.0015 era bono
-                            self._SwitchWFSTATE(i, 3)
+                            self._SwitchWFSTATE(i, 0)
                             print("esco da WFSTATE = 2 e entro in WFSTATE = 3 poichè sono abbastanza allineato col muro")
                         if np.abs(rL - self.prev_rL[i][0]) > 0.5 or rL == self.MAX_RANGE:
                             self._SwitchWFSTATE(i, 3)
@@ -663,11 +663,11 @@ class MapAviary(ProjAviary):
                          vel [i] = np.dot(  2*cv , [np.cos(np.pi/8) , - np.sin(np.pi/8),0.] )
                     if (rR != self.MAX_RANGE and np.abs(rR - self.DIST_WALL_REF)<self.td*8) and self.state4counter[i][0] > 200:
                         self.S_WF[i][0]=1
-                        self._SwitchWFSTATE(i, 1)
+                        self._SwitchWFSTATE(i, 0)
                         print("esco da WFSTATE = 4 (ho un muro a destra) e entro in WFSTATE = 3")
                     if (rL != self.MAX_RANGE and np.abs(rL - self.DIST_WALL_REF)<self.td*8) and self.state4counter[i][0] > 200:
                         self.S_WF[i][0]=-1
-                        self._SwitchWFSTATE(i, 1)
+                        self._SwitchWFSTATE(i, 0)
                         print("esco da WFSTATE = 4 (ho un muro a sinistra) e entro in WFSTATE = 3")
 
 
