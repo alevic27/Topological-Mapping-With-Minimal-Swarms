@@ -440,14 +440,14 @@ class MapAviary(ProjAviary):
                     if self.IM_IN_A_CORNER[i][0] == True:
                         if np.abs(rB - self.DIST_WALL_REF) < 8*self.td and np.abs(rR - self.DIST_WALL_REF) < 5*self.td: #and np.abs(rF - self.DIST_WALL_REF) > 10*self.td: # se dietro e destra so circa ar top
                             if rR != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.03 : # TODO: aggiusta sensibilità
-                                self._SwitchWFSTATE(i, 1)
+                                self._SwitchWFSTATE(i, 3)
                                 self.state1counter[i][0] = -80
                                 print("esco da WFSTATE = 0 (in un convesso) e entro in WFSTATE = 1")
                     elif self.MOVE_FORWARD[i][0] == True:
                         print ("l'angolo di curva accumulato è" , self.wfstate0_YAW_counter[i][0])
                         if np.abs(self.wfstate0_YAW_counter[i][0]) > 0.8 and np.abs(rR - self.prev_rR[i][0]) < self.td*0.01: # se l
                             #if np.abs(rR - self.DIST_WALL_REF) < self.td :
-                                self._SwitchWFSTATE(i, 1)
+                                self._SwitchWFSTATE(i, 3)
                                 print("esco da WFSTATE = 0 (ho un muro di fronte) e entro in WFSTATE = 1")
                     elif rR != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.01  :  
                         self._SwitchWFSTATE(i, 3)
@@ -457,14 +457,14 @@ class MapAviary(ProjAviary):
                     if self.IM_IN_A_CORNER[i][0] == True:
                         if np.abs(rB - self.DIST_WALL_REF) < 8*self.td and np.abs(rL - self.DIST_WALL_REF) < 5*self.td: #and np.abs(rF - self.DIST_WALL_REF) > 10*self.td: # se dietro e sinistra so circa ar top
                             if rL != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.03 : # TODO: aggiusta sensibilità
-                                self._SwitchWFSTATE(i, 1)
+                                self._SwitchWFSTATE(i, 3)
                                 self.state1counter[i][0] = -80
                                 print("esco da WFSTATE = 0 (in un convesso) e entro in WFSTATE = 1")
                     elif self.MOVE_FORWARD[i][0] == True:
                         print ("l'angolo di curva accumulato è" , self.wfstate0_YAW_counter[i][0])
                         if np.abs(self.wfstate0_YAW_counter[i][0]) >0.8 and np.abs(rL - self.prev_rL[i][0]) < self.td*0.01: # se l
                             #if np.abs(rL - self.DIST_WALL_REF) < self.td:
-                                self._SwitchWFSTATE(i, 1)
+                                self._SwitchWFSTATE(i, 3)
                                 print("esco da WFSTATE = 0 (ho un muro di fronte) e entro in WFSTATE = 1")
                     elif rL != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.01 :    
                         self._SwitchWFSTATE(i, 3)
@@ -659,7 +659,7 @@ class MapAviary(ProjAviary):
                     omega[i] = ([0])
                     if  len(superiors) == 0:
                         self.state5counter[i][0] += 1
-                        if self.state5counter[i][0] > 100 :
+                        if self.state5counter[i][0] > 50 :
                             self._SwitchWFSTATE(i, 6)
         ######################  STATO 6 : USCITA DAL COLLISION AVOIDANCE  ############################
             elif self.WFSTATE[i][0] == 6:
@@ -933,6 +933,14 @@ class MapAviary(ProjAviary):
                             collision[i] = 2
                         elif (self.WFSTATE[i][0] != 4 and self.WFSTATE[i][0] != 2 ) and (self.WFSTATE[nth_drone][0] == 4 or self.WFSTATE[nth_drone][0] == 2 ): # se il drone nth_drone sta in stato 4 o 6 ha la precedenza
                             collision[i] = 1
+                        elif (self.WFSTATE[i][0] == 4 or self.WFSTATE[i][0] == 2 ) and (self.WFSTATE[nth_drone][0] == 4 or self.WFSTATE[nth_drone][0] == 2 ):
+                            if self.WFSTATE[nth_drone][0] == 4 and self.WFSTATE[i][0] == 2:
+                               collision[i] = 1
+                            elif self.WFSTATE[nth_drone][0] == 2 and self.WFSTATE[i][0] == 4:
+                                collision[i] = 2
+                            else:
+                                if i < nth_drone: 
+                                    collision[i] = 2
                         elif self.WFSTATE[nth_drone] != -1:
                             if self.WFSTATE[nth_drone] == 5:
                                 collision[i] = 2
