@@ -195,7 +195,7 @@ def run(
         obs, observation, reward, terminated, truncated, info = env.step(action)
 
         #### Compute control for the current way point #############
-        TARGET_POS , TARGET_RPY , TARGET_VEL , TARGET_RPY_RATES = env.NextWP(obs,observation )       
+        TARGET_POS , TARGET_RPY , TARGET_VEL , TARGET_RPY_RATES = env.NextWP(obs,observation,INIT_XYZS )       
 
         # velocity control PLACEHOLDER #TO BE IMPLEMENTED
         #TARGET_VEL , TARGET_RPY_RATES = env.NextWP_VEL(obs,observation) #
