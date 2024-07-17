@@ -47,6 +47,7 @@ class MapAviary(ProjAviary):
                  total_area_polygon=Polygon([(0, 0), (2, 0), (2, 2), (4, 2), (4, 0), (6, 0), (6, 4), (0, 4)]),
                  point_coverage_radius=0.75,
                  target_coverage=90,
+                 maximum_battery_time=300,
                  ):
         
         """Initialization of an environment with drones capable of performing topological mapping.
@@ -151,10 +152,14 @@ class MapAviary(ProjAviary):
         self.total_area_polygon = total_area_polygon
         self.coverage_percent = 0 # percentuale di area coperta totale
         self.single_drone_coverage_percent = [] # percentuale di area coperta totale singolamente dal jesimo drone
+        # fine missione con TARGET_COVERAGE
         self.TARGET_COVERAGE = target_coverage
         self.point_coverage_radius = point_coverage_radius
         self.efficiency = 0 # appena il coverage_percent raggiunge il 90% viene salvato come valore temporale
         self.COVERAGE_IS_ENOUGH = False
+        # fine missione dopo tot tempo
+        self.MAXIMUM_BATTERY_TIME = maximum_battery_time
+        self.TIME_IS_OUT = False
         self.BLOCK_SIMULATION_WHEN_RETURNING_PHASE_STARTS = True
         self.returning_paths = {} # dizionario con i path di ritorno per tutti i droni
         self.NUM_WP = np.array([[0] for i in range(num_drones)])  # numero di WAYPOINTS del percorso di ritorno per ogni drone
@@ -175,11 +180,11 @@ class MapAviary(ProjAviary):
         TARGET_RPY_RATES = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
         #self.S_WF=self._decisionSystem()  # controllare se aggiornare in self o no
 
-        if self.COVERAGE_IS_ENOUGH == False:
+        if self.COVERAGE_IS_ENOUGH == False and self.TIME_IS_OUT == False:
             TARGET_OMEGA, RELATIVE_FRAME_VEL , self.WFSTATE , self.S_WF, droni_nelle_vicinanze = self._WallFollowing3()
 
         for i in range(self.NUM_DRONES) :
-            if self.COVERAGE_IS_ENOUGH == False:  
+            if self.COVERAGE_IS_ENOUGH == False and self.TIME_IS_OUT == False:  
                 yaw = obs[i][9]
                 print("absolute yaw =", np.degrees(yaw),"°")
                 rot_mat = np.array([[np.cos(yaw) ,-np.sin(yaw) , 0.0],  
@@ -241,6 +246,7 @@ class MapAviary(ProjAviary):
                     else :
                         self.RELATIVE_FRAME_DIRECTION = self.RELATIVE_FRAME_DIRECTION/np.linalg.norm(self.RELATIVE_FRAME_DIRECTION)
                         ABSOLUTE_FRAME_DIRECTION = np.dot(self.RELATIVE_FRAME_DIRECTION, rot_mat.T )  
+
                         TARGET_POS[i][0] =  self.memory_position[i][0] + self.spostamento_laterale* ABSOLUTE_FRAME_DIRECTION[0]
                         TARGET_POS[i][1] =  self.memory_position[i][1] + self.spostamento_laterale *ABSOLUTE_FRAME_DIRECTION[1]
                         TARGET_POS[i][2] =  self.memory_position[i][2] + 0.3 * ABSOLUTE_FRAME_DIRECTION[2]
@@ -276,7 +282,6 @@ class MapAviary(ProjAviary):
                 TARGET_RPY_RATES[i][1] = 0.
                 TARGET_RPY_RATES[i][2] = TARGET_OMEGA[i]
             else:
-
             ########## WAYPOINT ########
                 # usando wp_counters e NUM_WP, restituiti da 
                     #TARGET_POS[i] = NEXT_WP
@@ -286,16 +291,24 @@ class MapAviary(ProjAviary):
 
         for j in range(self.NUM_DRONES) : # saves actual mindist to distance[0]. It will be the prev_dist of next step
             self.distance[j][0] =  self.distance[j][1]
-        ### CALCOLO COVERAGE PER LA LOGICA DI FINE MISSIONE ###
+        ### LOGICA DI FINE MISSIONE ###
         self.coverage_percent = self.calculate_coverage(self.point_coverage_radius)
         self.single_drone_coverage_percent = self.calculate_coverage_individually(self.point_coverage_radius)
+        if self.TIME_IS_OUT == False:
+            time_passed = self.step_counter * self.PYB_TIMESTEP
+            if time_passed >= self.MAXIMUM_BATTERY_TIME:
+                self.TIME_IS_OUT = True
+                self.plot_coverage(self.total_area_polygon, radius=0.75)  # Plotta la copertura totale
+                self.returning_phase_paths_planning()
+            
         print(f"La percentuale totale di esplorazione è: {self.coverage_percent:.2f}%")
         for i, coverage in enumerate(self.single_drone_coverage_percent):
             print(f"La percentuale di esplorazione del drone {i+1} è: {coverage:.2f}%")
         return TARGET_POS, TARGET_RPY, TARGET_VEL, TARGET_RPY_RATES
 
     def waypoint_nav(self,
-                     drone_id):
+                     drone_id,
+                     max_step_distance=0.1):
         """
         Parametres
         --------
@@ -310,11 +323,18 @@ class MapAviary(ProjAviary):
             (3)-shaped array con la velocità desiderata
         """
         if self.wp_counters[drone_id][0] == self.NUM_WP[drone_id][0]: # se ho raggiunto tutti i WAYPOINTS
-            target_pos = self.pos[drone_id] # mettici l'ultimo wp invece della pos
+            target_pos = np.array(self.drones_db[drone_id][waypoint_id]['coords']) # mettici l'ultimo wp invece della pos
         else:
             wp_counter = self.wp_counters[drone_id][0]
             waypoint_id = self.returning_paths[drone_id][wp_counter] 
             target_pos = np.array(self.drones_db[drone_id][waypoint_id]['coords'])
+            #comparo il comando per vedere se è aggressivo (troppo lontano)
+            current_pos = self.pos[drone_id]
+            direction_vector = target_pos - current_pos
+            distance_to_target = np.linalg.norm(direction_vector)
+            if distance_to_target > max_step_distance: #se troppo lontano
+                direction_vector_normalized = direction_vector / distance_to_target
+                target_pos = current_pos + direction_vector_normalized * max_step_distance
             self.update_wp_counter(drone_id,target_pos)
         return target_pos
     
@@ -577,8 +597,6 @@ class MapAviary(ProjAviary):
                         if np.abs(rF- self.DIST_WALL_REF)<self.td*0.5:
                            self._SwitchWFSTATE(i, 0)
                     
-                            
-
         ######################  STATO 3 : POST-0 / POST-CURVA AVVICINAMENTO A DISTWALLREF  ############################
         ### avvia dopo la curva quando il drone è circa parallelo al muro, serve a portarlo a DISTWALLREF con una velocità laterale
         ### possibili migliorie:
@@ -1752,7 +1770,9 @@ class MapAviary(ProjAviary):
             covered_area = union_buffers.area
             coverage_percent = (covered_area / self.total_area_polygon.area) * 100
             coverage_per_drone.append(coverage_percent)
-
+        ############# OBSOLETO ##############
+        # 17 / 07 - il fine missione si basa sul tempo trascorso
+        # per evitare questo basta settare TARGET_COVERAGE = 101
         if all(coverage >= self.TARGET_COVERAGE for coverage in coverage_per_drone) \
                 and not self.COVERAGE_IS_ENOUGH:
             self.efficiency = self.step_counter * self.PYB_TIMESTEP

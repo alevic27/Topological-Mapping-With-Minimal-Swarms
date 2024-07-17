@@ -6,7 +6,8 @@ class Labyrinth(assets_list):
 
     BASEAVIARY = "0"
     DOUBLE_T = "2t"   
-    DOUBLE_T_2X = "2t_2x"
+    DOUBLE_T_2X = "2t_2x"   # scalato 2x
+    DOUBLE_T_V2 = "2t_v2"   # scalato 2x tenendo i corridoi della stessa larghezza
 
 # Definizione del dizionario con i dati dei labirinti
 LABYRINTH_CONFIG = {
@@ -24,6 +25,13 @@ LABYRINTH_CONFIG = {
                                 (2.0, -6.2), (2.0, -2.0), (6.0, -2.0)]),
         "starting_coords_offset": np.array([-2.0, 0.0, 0.0])
     },
+    Labyrinth.DOUBLE_T_V2: {
+        "name": "Labirinto Doppia T scalato 2x in direzioni X e Y v2",
+        "polygon": Polygon([(6.0, 1.0), (1.0, 1.0), (1.0, 8.0), (5.8, 8.0), (5.8, 9.8), (-5.8, 9.8), (-5.8, 8.0),
+                                (-1.0, 8.0), (-1.0, -8.0), (-5.8, -8.0), (-5.8, -9.8), (5.8, -9.8), (5.8, -8.0),
+                                (1.0, -8.0), (1.0, -1.0), (6.0, -1.0)]),
+        "starting_coords_offset": np.array([-3.0, 0.0, 0.0])
+    }
     # Aggiungi altri labirinti qui con le loro configurazioni
 }
 

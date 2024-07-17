@@ -32,7 +32,7 @@ DEFAULT_GUI = True
 DEFAULT_PLOT = True
 DEFAULT_SIMULATION_FREQ_HZ = 240
 DEFAULT_CONTROL_FREQ_HZ = 48
-DEFAULT_DURATION_SEC = 240
+DEFAULT_DURATION_SEC = 300
 
 DEFAULT_IMG_RES = np.array([64, 48])
 
@@ -42,7 +42,7 @@ DEFAULT_SENSORS_RANGE = 4.
 ##### SCELTA LABIRINTO tra:
 # DOUBLE_T
 # DOUBLE_T_2X
-DEFAULT_LABYRINTH_ID = Labyrinth.DOUBLE_T #modificare solo questa riga
+DEFAULT_LABYRINTH_ID = Labyrinth.DOUBLE_T_V2 #modificare solo questa riga
 # Configurazione del labirinto selezionato
 selected_config = LABYRINTH_CONFIG[DEFAULT_LABYRINTH_ID]
 DEFAULT_MAP_POLYGON = selected_config["polygon"]
@@ -52,13 +52,14 @@ STARTING_COORDS_OFFSET = selected_config["starting_coords_offset"]
 
 DEFAULT_REF_DISTANCE = 0.75
 DEFAULT_POINT_COVERAGE_RADIUS = 0.75 # con 0.75 raggiunge al massimo 70% coverage
-DEFAULT_TARGET_COVERAGE_PERCENT = 50 
+DEFAULT_TARGET_COVERAGE_PERCENT = 95 
 
 DEFAULT_S_WF: int = +1   #wallfollowing side
 DEFAULT_CONTROL_OMEGA : float = 0.5  #works with 0.5
 DEFAULT_CONTROL_VELOCITY: float = 0.2  #works with 0.2
 DEFAULT_WFSTATE : int = -1
 DEFAULT_THRESHOLD_DISTANCE : float = 0.03
+DEFAULT_DRONES_TIME_BEFORE_RETURN = 240
 
 DEFAULT_MERGING_GRAPHS_LOGIC = True
 DEFAULT_MAX_DISTANCE_BETWEEN_NODES = 0.6 # 0.6 
@@ -93,6 +94,7 @@ def run(
         total_area_polygon=DEFAULT_MAP_POLYGON,
         point_coverage_radius=DEFAULT_POINT_COVERAGE_RADIUS,
         target_coverage=DEFAULT_TARGET_COVERAGE_PERCENT,
+        maximum_battery_time=DEFAULT_DRONES_TIME_BEFORE_RETURN,
         ):
     
     ### definisci le posizioni iniziali dei droni
@@ -162,6 +164,7 @@ def run(
                     total_area_polygon=total_area_polygon,
                     point_coverage_radius=point_coverage_radius,
                     target_coverage=target_coverage,
+                    maximum_battery_time=maximum_battery_time,
                     )
     
     #### Initialize the controllers ############################

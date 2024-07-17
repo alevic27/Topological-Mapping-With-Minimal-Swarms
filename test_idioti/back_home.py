@@ -208,7 +208,7 @@ class DroneNavigation:
 # Example usage
 # Assuming self.drones_db and self.adjacency_matrices are already defined
 drones_db = {
-    0: {
+    1: {
         '0001' : {'coords': [-2.3       ,  0.        ,  0.99744854], 'type': 'start', 'addition': 'previous'},
         '0002' : {'coords': [-1.4292195786376658, 0.022519763433567742, 1.0098575747957583], 'type': 'junction', 'addition': 'previous'},
         '0003' : {'coords': [0.10761251292975722, 0.832806974640565, 1.0183548517292362], 'type': 'junction', 'addition': 'previous'},
@@ -216,7 +216,9 @@ drones_db = {
         '0006' : {'coords': [-0.23771900466745266, 1.7917685981584477, 1.0279823937014205], 'type': 'corridor', 'addition': 'previous'},
         '0007' : {'coords': [-0.18482302687225086, 2.827720604035303, 1.0383707701781797], 'type': 'corridor', 'addition': 'previous'},
         '0008' : {'coords': [2.201565074435422, 3.936766618618564, 1.0756826610436059], 'type': 'corridor', 'addition': 'last'},
-}}
+}
+
+}
 
 adjacency_matrices = [
     [
