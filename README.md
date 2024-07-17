@@ -3,7 +3,7 @@ TESTO
 ## Inizializzazione
 
 - Installare tutte le dependencies di gym-pybullet-drones (seguire il readme della repo)
-- Installare libreria shapely
+- Installare libreria shapely nell'environment di conda "drones" generato seguendo le indicazioni di gym-pybullet-drones
 >> pip install shapely
 - Aprire terminale e runnare
 

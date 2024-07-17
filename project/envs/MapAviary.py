@@ -149,12 +149,13 @@ class MapAviary(ProjAviary):
         self.max_distance_between_nodes = max_distance_between_nodes
         ## variabili missione
         self.total_area_polygon = total_area_polygon
-        self.coverage_percent = 0 #percentuale di area coperta
+        self.coverage_percent = 0 # percentuale di area coperta totale
+        self.single_drone_coverage_percent = [] # percentuale di area coperta totale singolamente dal jesimo drone
         self.TARGET_COVERAGE = target_coverage
         self.point_coverage_radius = point_coverage_radius
         self.efficiency = 0 # appena il coverage_percent raggiunge il 90% viene salvato come valore temporale
         self.COVERAGE_IS_ENOUGH = False
-        self.BLOCK_SIMULATION_WHEN_RETURNING_PHASE_STARTS = False
+        self.BLOCK_SIMULATION_WHEN_RETURNING_PHASE_STARTS = True
         self.returning_paths = {} # dizionario con i path di ritorno per tutti i droni
         self.NUM_WP = np.array([[0] for i in range(num_drones)])  # numero di WAYPOINTS del percorso di ritorno per ogni drone
         self.wp_counters = np.array([[0] for i in range(num_drones)])  # contatore del prossimo WAYPOINT DA RAGGIUNGERE
@@ -173,7 +174,6 @@ class MapAviary(ProjAviary):
         TARGET_VEL = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
         TARGET_RPY_RATES = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
         #self.S_WF=self._decisionSystem()  # controllare se aggiornare in self o no
-
 
         if self.COVERAGE_IS_ENOUGH == False:
             TARGET_OMEGA, RELATIVE_FRAME_VEL , self.WFSTATE , self.S_WF, droni_nelle_vicinanze = self._WallFollowing3()
@@ -275,7 +275,10 @@ class MapAviary(ProjAviary):
             self.distance[j][0] =  self.distance[j][1]
         ### CALCOLO COVERAGE PER LA LOGICA DI FINE MISSIONE ###
         self.coverage_percent = self.calculate_coverage(self.point_coverage_radius)
-        print(f"La percentuale di esplorazione è: {self.coverage_percent:.2f}%")
+        self.single_drone_coverage_percent = self.calculate_coverage_individually(self.point_coverage_radius)
+        print(f"La percentuale totale di esplorazione è: {self.coverage_percent:.2f}%")
+        for i, coverage in enumerate(self.single_drone_coverage_percent):
+            print(f"La percentuale di esplorazione del drone {i+1} è: {coverage:.2f}%")
         return TARGET_POS, TARGET_RPY, TARGET_VEL, TARGET_RPY_RATES
 
     def waypoint_nav(self,
@@ -294,7 +297,7 @@ class MapAviary(ProjAviary):
             (3)-shaped array con la velocità desiderata
         """
         if self.wp_counters[drone_id][0] == self.NUM_WP[drone_id][0]: # se ho raggiunto tutti i WAYPOINTS
-            target_pos = self.pos[drone_id]
+            target_pos = self.pos[drone_id] # mettici l'ultimo wp invece della pos
         else:
             wp_counter = self.wp_counters[drone_id][0]
             waypoint_id = self.returning_paths[drone_id][wp_counter] 
@@ -646,7 +649,6 @@ class MapAviary(ProjAviary):
                          vel [i] = np.dot(  2*cv , [np.cos(np.pi/8) , - np.sin(np.pi/8),0.] )
                     elif (rR - self.prev_rR[i][0]) <- self.td*0.01: 
                          vel [i] = np.dot(  2*cv , [np.cos(np.pi/8) , + np.sin(np.pi/8),0.] )
-
                     if (np.abs(rL - self.prev_rL[i][0]) < self.td*0.5 and (rL != self.MAX_RANGE or np.abs(rL - self.DIST_WALL_REF)<self.td*2)) and self.state4counter[i][0] > 200:
                         self._SwitchWFSTATE(i, 3)
                         print("esco da WFSTATE = 4 (ho un muro a sinistra) e entro in WFSTATE = 1")
@@ -1715,12 +1717,53 @@ class MapAviary(ProjAviary):
         union_buffers = unary_union(buffers)
         covered_area = union_buffers.area
         coverage_percent = (covered_area / self.total_area_polygon.area) * 100
-        if coverage_percent >= self.TARGET_COVERAGE and self.COVERAGE_IS_ENOUGH == False:
-            self.efficiency = self.step_counter*self.PYB_TIMESTEP
-            self.COVERAGE_IS_ENOUGH = True
-            self.plot_coverage(self.total_area_polygon, radius) #TODO: vedere come deve esssere l'input EVALUATOR
-            self.returning_phase_paths_planning()
+        ############# OBSOLETO ##############
+        # faccio la verifica di fine missione sulle singole percentuali non sul totale
+        ## if coverage_percent >= self.TARGET_COVERAGE and self.COVERAGE_IS_ENOUGH == False:
+        ##     self.efficiency = self.step_counter*self.PYB_TIMESTEP
+        ##     self.COVERAGE_IS_ENOUGH = True
+        ##     self.plot_coverage(self.total_area_polygon, radius) #TODO: vedere come deve esssere l'input EVALUATOR
+        ##     self.returning_phase_paths_planning()
         return coverage_percent
+
+    def calculate_coverage_individually(self, radius):
+        """
+        Calcola la percentuale di copertura dell'area da parte di ciascun drone.
+
+        Parameters
+        ----------
+        radius : float
+            Il raggio degli intorni circolari intorno a ciascun nodo.
+
+        Returns
+        -------
+        list of float
+            Una lista contenente la percentuale di copertura dell'area per ciascun drone.
+        """
+        coverage_per_drone = []
+
+        for drone_id, points in self.drones_db.items():
+            buffers = []
+            for point_id, data in points.items():
+                coords = data['coords']
+                point = Point(coords[0], coords[1])
+                buffer = point.buffer(radius).intersection(self.total_area_polygon)
+                buffers.append(buffer)
+
+            union_buffers = unary_union(buffers)
+            covered_area = union_buffers.area
+            coverage_percent = (covered_area / self.total_area_polygon.area) * 100
+            coverage_per_drone.append(coverage_percent)
+
+        if all(coverage >= self.TARGET_COVERAGE for coverage in coverage_per_drone) \
+                and not self.COVERAGE_IS_ENOUGH:
+            self.efficiency = self.step_counter * self.PYB_TIMESTEP
+            self.COVERAGE_IS_ENOUGH = True
+            self.plot_coverage(self.total_area_polygon, radius)  # Plotta la copertura totale
+            self.returning_phase_paths_planning()
+
+        return coverage_per_drone
+
 
     def plot_coverage(self, total_area_polygon, radius):
         """
