@@ -584,10 +584,9 @@ class MapAviary(ProjAviary):
                     # e solo ora faccio la verifica con grosso salto di rR # TODO sensibilità da tunare
                     if self.S_WF[i][0] == 1: # wallfollowing con muro a destra
                         print("la differenza tra il range destro attuale e precedente è:", np.abs(rR - self.prev_rR[i][0]) )
-                        print("la tolleranza per passare a 3 è", self.td*0.0015)
                         if self.prev_rR[i][0] != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.001:
                             self._SwitchWFSTATE(i, 0)
-                            print("esco da WFSTATE = 2 e entro in WFSTATE = 3 poichè sono abbastanza allineato col muro")
+                            print("esco da WFSTATE = 2 e entro in WFSTATE = 0 poichè sono abbastanza allineato col muro")
                         if np.abs(rR - self.prev_rR[i][0]) > 0.5 or rR == self.MAX_RANGE:
                            self._SwitchWFSTATE(i, 3)
                         if np.abs(rF- self.DIST_WALL_REF)<self.td:
@@ -596,7 +595,7 @@ class MapAviary(ProjAviary):
                         print("la differenza tra il range sinistro attuale e precedente è:", np.abs(rL - self.prev_rL[i][0]) )
                         if self.prev_rL[i][0] != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.001 : # 0.0015 era bono
                             self._SwitchWFSTATE(i, 0)
-                            print("esco da WFSTATE = 2 e entro in WFSTATE = 3 poichè sono abbastanza allineato col muro")
+                            print("esco da WFSTATE = 2 e entro in WFSTATE = 0 poichè sono abbastanza allineato col muro")
                         if np.abs(rL - self.prev_rL[i][0]) > 0.5 or rL == self.MAX_RANGE:
                             self._SwitchWFSTATE(i, 3)
                         if np.abs(rF- self.DIST_WALL_REF)<self.td:
@@ -609,7 +608,8 @@ class MapAviary(ProjAviary):
             elif self.WFSTATE[i][0] == 3:
                 self.state3counter[i][0] += 1 
                 if self.S_WF[i][0] == 1: # wallfollowing con muro a destra
-                    if  (np.abs(rR - self.prev_rR[i][0])  > 0.5 or rR == self.MAX_RANGE) and self.state3counter[i][0] < 120 :
+                    if  (np.abs(rR - self.DIST_WALL_REF)  > 0.5) and self.state3counter[i][0] < 120 :
+                    #se rischio di aver perso il ranger post curva vado un pò avanti
                         vel [i] = np.dot(  cv , [1. , 0. , 0.] )
                         omega[i] = ([0]) 
                     else :
@@ -623,20 +623,23 @@ class MapAviary(ProjAviary):
                         else:
                             vel[i] = np.dot(  cv ,[np.cos(np.pi/3) , np.sin(np.pi/3) , 0.] )
                 elif self.S_WF[i][0] == -1: # wallfollowing con muro a sinistra
-                        if  (np.abs(rL - self.prev_rL[i][0])  > 0.5 or rL == self.MAX_RANGE) and self.state3counter[i][0] < 120 :
-                            vel [i] = np.dot(  cv , [1. , 0. , 0.] )
-                            omega[i] = ([0]) 
+                    if  (np.abs(rL - self.DIST_WALL_REF)  > 0.5) and self.state3counter[i][0] < 120 :
+                    #se rischio di aver perso il ranger post curva vado un pò avanti
+                        vel [i] = np.dot(  cv , [1. , 0. , 0.] )
+                        omega[i] = ([0]) 
+                    else: # se ho ancora un range laterale affidabile
+                        omega[i] = ([0]) 
+                        vel [i] = np.dot(  cv , [0. , 0. , 0.] )
+                        if np.abs(rL - self.DIST_WALL_REF) < self.td*0.5:
+                            self._SwitchWFSTATE(i, 1)
+                            print("esco da WFSTATE = 3 e entro in WFSTATE = 1 poichè sono alla dist giusta dal muro")
+                        elif rL > self.DIST_WALL_REF:
+                            vel[i] = np.dot(  cv , [np.cos(np.pi/3) , np.cos(np.pi/3) , 0.] )
                         else:
-                            omega[i] = ([0]) 
-                            vel [i] = np.dot(  cv , [0. , 0. , 0.] )
-                            if np.abs(rL - self.DIST_WALL_REF) < self.td*0.5:
-                                self._SwitchWFSTATE(i, 1)
-                                print("esco da WFSTATE = 3 e entro in WFSTATE = 1 poichè sono alla dist giusta dal muro")
-                            elif rL > self.DIST_WALL_REF:
-                                vel[i] = np.dot(  cv ,  [np.cos(np.pi/3) , np.sin(np.pi/3)  , 0.] )
-                            else:
-                                vel[i] = np.dot(  cv , [np.cos(np.pi/3), - np.sin(np.pi/3) , 0.] )
-        ######################  STATO 4 : IN UN incrocio SE SCELGO DI GIRARE NEL VERSO OPPOSTO AL MURO CHE SEGUO  ############################
+                            vel[i] = np.dot(  cv , [np.cos(np.pi/3) , -np.cos(np.pi/3) , 0.] )
+        ######################  STATO 4 : AVANZAMENTO LINEARE SENZA RIFERIMENTI  ############################
+        ### avvia dopo che a una junction il drone decide di andare dritto
+        ### il problema è la mancanza di riferimento e le condizioni di uscita sono su rR, rL e rF
             elif self.WFSTATE[i][0] == 4:               
                 omega [i] = ([0])
                 vel [i] = np.dot(  2*cv , [1. , 0. , 0.] )
@@ -650,19 +653,17 @@ class MapAviary(ProjAviary):
                             self.S_WF[i][0]=-1
                         self._SwitchWFSTATE(i, 0)
                         print("esco da WFSTATE = 4 (ho un muro davanti) e entro in WFSTATE = 0")
-                else: # distanza frontale ancora non DWR
-                    if (rL - self.prev_rL[i][0]) > self.td*0.01:
-                        vel [i] = np.dot(  2*cv , [np.cos(np.pi/8) , np.sin(np.pi/8),0.] )
-                    elif (rL - self.prev_rL[i][0]) <- self.td*0.01: 
-                         vel [i] = np.dot(  2*cv , [np.cos(np.pi/8) , - np.sin(np.pi/8),0.] )
-                    if (rR != self.MAX_RANGE and np.abs(rR - self.DIST_WALL_REF)<self.td*8) and self.state4counter[i][0] > 200:
-                        self.S_WF[i][0]=1
+                elif self.state4counter[i][0] > 150 : # distanza frontale ancora non DWR
+                # se la rF è ancora maggiore e ho comunque camminato un tot
+                # mi devo assicurare di non toccare un muro in maniera diagonale
+                    if np.abs(rR - self.DIST_WALL_REF) < self.td:
+                        self.S_WF[i][0]= 1   
                         self._SwitchWFSTATE(i, 0)
                         print("esco da WFSTATE = 4 (ho un muro a destra) e entro in WFSTATE = 3")
-                    if (rL != self.MAX_RANGE and np.abs(rL - self.DIST_WALL_REF)<self.td*8) and self.state4counter[i][0] > 200:
-                        self.S_WF[i][0]=-1
+                    elif np.abs(rL - self.DIST_WALL_REF) < self.td:
+                        self.S_WF[i][0]= -1
                         self._SwitchWFSTATE(i, 0)
-                        print("esco da WFSTATE = 4 (ho un muro a sinistra) e entro in WFSTATE = 3")
+                        print("esco da WFSTATE = 4 (ho un muro a sinistra) e entro in WFSTATE = 3")                        
                 ###### Topological
                 if self.state4counter[i][0] == 80: # era 100 ; TODO: aggiungi che lo fa anche se capisce di essere in junction
                     self.add_point(i,self.pos[i],'corridor')
@@ -748,7 +749,7 @@ class MapAviary(ProjAviary):
     #### LOGICA CORNER ACKNOWLEDGEMENT ###
             if old_WFSTATE == 1 and new_WFSTATE == 0: # 
                 self.IM_IN_A_CORNER[nth_drone][0] = True
-            if old_WFSTATE == 0 and new_WFSTATE == 1:
+            if old_WFSTATE == 0:
                 if self.IM_IN_A_CORNER[nth_drone][0] == True:
                     self.add_point(nth_drone,self.pos[nth_drone],'corner')
                 self.IM_IN_A_CORNER[nth_drone][0] = False
