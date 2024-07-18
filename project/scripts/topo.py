@@ -10,7 +10,7 @@ from shapely.geometry import Point, Polygon
 from shapely.ops import unary_union
 
 from gym_pybullet_drones.utils.Logger import Logger
-from project.envs.MapAviary_gab2 import MapAviary
+from project.envs.MapAviary import MapAviary
 from project.assets.assets_list import Labyrinth, LABYRINTH_CONFIG
 from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
 from gym_pybullet_drones.utils.utils import sync, str2bool
@@ -43,7 +43,7 @@ DEFAULT_SENSORS_RANGE = 4.
 # DOUBLE_T
 # DOUBLE_T_2X raddoppiato corridoi larghi
 # DOUBLE_T_V2 raddoppiato corridoi stretti
-DEFAULT_LABYRINTH_ID = Labyrinth.DOUBLE_T_V2 #modificare solo questa riga
+DEFAULT_LABYRINTH_ID = Labyrinth.DOUBLE_T #modificare solo questa riga
 # Configurazione del labirinto selezionato
 selected_config = LABYRINTH_CONFIG[DEFAULT_LABYRINTH_ID]
 DEFAULT_MAP_POLYGON = selected_config["polygon"]
@@ -52,8 +52,9 @@ DEFAULT_MAP_POLYGON = Polygon(new_coords)
 STARTING_COORDS_OFFSET = selected_config["starting_coords_offset"]
 
 DEFAULT_REF_DISTANCE = 0.75
-DEFAULT_POINT_COVERAGE_RADIUS = 0.75 # con 0.75 raggiunge al massimo 70% coverage
-DEFAULT_TARGET_COVERAGE_PERCENT = 99 
+DEFAULT_POINT_COVERAGE_RADIUS = 1 # con 0.75 raggiunge al massimo 70% coverage, toccherebbe metterlo metà della larghezza dei corridoi
+DEFAULT_TARGET_TOTAL_COVERAGE_PERCENT = 80 
+DEFAULT_TARGET_SINGLE_COVERAGE_PERCENT = 50
 
 DEFAULT_S_WF: int = +1   #wallfollowing side
 DEFAULT_CONTROL_OMEGA : float = 0.5  #works with 0.5
@@ -94,7 +95,8 @@ def run(
         max_distance_between_nodes=DEFAULT_MAX_DISTANCE_BETWEEN_NODES,
         total_area_polygon=DEFAULT_MAP_POLYGON,
         point_coverage_radius=DEFAULT_POINT_COVERAGE_RADIUS,
-        target_coverage=DEFAULT_TARGET_COVERAGE_PERCENT,
+        total_target_coverage=DEFAULT_TARGET_TOTAL_COVERAGE_PERCENT,
+        single_target_coverage=DEFAULT_TARGET_SINGLE_COVERAGE_PERCENT,
         maximum_battery_time=DEFAULT_DRONES_TIME_BEFORE_RETURN,
         ):
     
@@ -165,7 +167,8 @@ def run(
                     max_distance_between_nodes=max_distance_between_nodes,
                     total_area_polygon=total_area_polygon,
                     point_coverage_radius=point_coverage_radius,
-                    target_coverage=target_coverage,
+                    total_target_coverage=total_target_coverage,
+                    single_target_coverage=single_target_coverage,
                     maximum_battery_time=maximum_battery_time,
                     )
     
