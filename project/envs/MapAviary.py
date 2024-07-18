@@ -519,15 +519,22 @@ class MapAviary(ProjAviary):
                     #else:
                     #    self.START[i] = 0
 
-                if self.START[i] < 2 and i!=0 :
+                if self.START[i] < 1 and i!=0 :
                     omega [i] = ([0])
                     vel [i] = np.dot(  0 , [1. , 0. , 0.] )
 
                 self.stateminus1counter[i][0] += 1
-                if np.abs(rR - self.DIST_WALL_REF) > 1.5 or np.abs(rL - self.DIST_WALL_REF) > 1.5 : 
+                if np.abs(rF - self.DIST_WALL_REF) < self.td  and (self.START[i] ==1 or i ==0): # np.abs(rR - self.DIST_WALL_REF) > 1.5 or np.abs(rL - self.DIST_WALL_REF) > 1.5 : 
                     #scelta randomica del muro da seguire   
-                    self._SwitchWFSTATE(i, 4)
-                    print("esco da WFSTATE = -1 e entro in WFSTATE = 4")
+                    if np.abs(rL - self.DIST_WALL_REF)>0.5 and np.abs(rR- self.DIST_WALL_REF)>0.5  :
+                            self.S_WF[i][0] = self._decisionSystem(i)
+                    elif np.abs(rL - self.DIST_WALL_REF)>0.5 :
+                            self.S_WF[i][0]=1
+                    else:
+                        self.S_WF[i][0]=-1
+                    self._SwitchWFSTATE(i, 0)
+                        
+                    print("esco da WFSTATE = -1 e entro in WFSTATE = 0, ho incontrato un muro di fronte")
                 elif (rR - self.prev_rR[i][0]) > self.td*0.001:
                         omega[i]=([-1*self.C_OMEGA*0.5])
                 elif (rR - self.prev_rR[i][0]) <- self.td*0.001: 
@@ -681,11 +688,11 @@ class MapAviary(ProjAviary):
                         vel [i] = np.dot(  2*cv , [np.cos(np.pi/8) , np.sin(np.pi/8),0.] )
                     elif (rL - self.prev_rL[i][0]) <- self.td*0.01: 
                          vel [i] = np.dot(  2*cv , [np.cos(np.pi/8) , - np.sin(np.pi/8),0.] )
-                    if (rR != self.MAX_RANGE and np.abs(rR - self.DIST_WALL_REF)<self.td*8) and self.state4counter[i][0] > 200:
+                    if (rR != self.MAX_RANGE and rR < self.DIST_WALL_REF*1.5) and self.state4counter[i][0] > 200:
                         self.S_WF[i][0]=1
                         self._SwitchWFSTATE(i, 0)
                         print("esco da WFSTATE = 4 (ho un muro a destra) e entro in WFSTATE = 3")
-                    if (rL != self.MAX_RANGE and np.abs(rL - self.DIST_WALL_REF)<self.td*8) and self.state4counter[i][0] > 200:
+                    if (rL != self.MAX_RANGE and rL < self.DIST_WALL_REF*1.5) and self.state4counter[i][0] > 200:
                         self.S_WF[i][0]=-1
                         self._SwitchWFSTATE(i, 0)
                         print("esco da WFSTATE = 4 (ho un muro a sinistra) e entro in WFSTATE = 3")
@@ -761,11 +768,11 @@ class MapAviary(ProjAviary):
             elif new_WFSTATE == 6:
                 self.state6counter[nth_drone][0] = 0
     #sezione start missione
-            if new_WFSTATE == 4 and old_WFSTATE == -1 and nth_drone!=self.NUM_DRONES-1:
+            if new_WFSTATE == 0 and old_WFSTATE == -1 and nth_drone!=self.NUM_DRONES-1:
                 self.START[nth_drone+1]= 1
-            if nth_drone!=self.NUM_DRONES-1:
-                if self.START[nth_drone+1] == 1 and new_WFSTATE == 0 and old_WFSTATE == 4:
-                    self.START[nth_drone+1]= 2
+            #if nth_drone!=self.NUM_DRONES-1:
+                #if self.START[nth_drone+1] == 1 and new_WFSTATE == 0 and old_WFSTATE == 4:
+                    #self.START[nth_drone+1]= 2
     ## SEZIONE AGGIUNTA PUNTI ##  
     # TODO: aggiunta punti in stato 4 (SOLO SE NECESSARIO) e -1>>>2
             if new_WFSTATE == 4:
@@ -978,7 +985,7 @@ class MapAviary(ProjAviary):
                         collision[i] = 1
                     elif (relative_position_rel[0]>=0.2 and motion_drones < -0.0001 )\
                           or ( relative_position_rel[0]<= -0.2 and motion_drones < -0.0001) \
-                           or drones_distance[i] < 0.30   :
+                           or drones_distance[i] < seLf.DIST_WALL_REF  :
                      # prima e seconda condizione sono per capire se lo ho davanti e gli sto andando in contro o se sono molto vicini
                      #la seconda è per capire se lo ho dietro e lui mi sta venendo incontro
                      #la terza controllo se è a una quota pericolosa                  
