@@ -189,6 +189,7 @@ class MapAviary(ProjAviary):
             ### NAVIGAZIONE WALLFOLLWING ###
             if self.COVERAGE_IS_ENOUGH == False and self.TIME_IS_OUT == False: 
                 yaw = obs[i][9]
+                yaw = self.rpy[i][2]
                 print("absolute yaw =", np.degrees(yaw),"°")
                 rot_mat = np.array([[np.cos(yaw) ,-np.sin(yaw) , 0.0],  
                                     [np.sin(yaw) , np.cos(yaw) , 0.0],                                           
@@ -232,9 +233,9 @@ class MapAviary(ProjAviary):
                                 self.spostamento_laterale = 0.3
                     if self.memory_state[i] == -1 : #se il drone è nello stato di inizio missione permane nella posizione in attesa di partire
 
-                        TARGET_POS[i][0] =  self.memory_position[i][0] 
-                        TARGET_POS[i][1] =  self.memory_position[i][1] 
-                        TARGET_POS[i][2] =  self.memory_position[i][2]
+                        TARGET_POS[i] =  self.memory_position[i][0:3]
+                        #TARGET_POS[i][1] =  self.memory_position[i][1] 
+                        #TARGET_POS[i][2] =  self.memory_position[i][2]
 
                         TARGET_RPY[i][0] = obs[i][7]    #self.memory_position[i][3]
                         TARGET_RPY[i][1] = obs[i][8]    #self.memory_position[i][4]

@@ -140,6 +140,9 @@ class MapAviary(ProjAviary):
         self.WF_ref_angle = np.array([[0.] for j in range(self.NUM_DRONES)] ) # yaw di riferimento di start dello stato 1 per non allontanarsi troppo dalla direzione parallela
         self.memory_state = np.array([[9] for j in range(self.NUM_DRONES)] ) # memory dello stato in cui ci strova prima di una collision
         self.memory_position = np.array([[0. , 0. ,0. , 0. ,0. ,0.] for j in range(self.NUM_DRONES)] )
+        for i in range(self.NUM_DRONES):
+            self.memory_position[i][0:3] = initial_xyzs[i]
+        self.waiting_position = initial_xyzs
         ## variabili collision avoidance
         self.drones_distance_pre = np.array([[0.] for j in range(self.NUM_DRONES)] )
         ## variabili database 
@@ -188,11 +191,12 @@ class MapAviary(ProjAviary):
         for i in range(self.NUM_DRONES) :
             ### NAVIGAZIONE WALLFOLLWING ###
             if self.COVERAGE_IS_ENOUGH == False and self.TIME_IS_OUT == False: 
-                yaw = obs[i][9]
+                #yaw = obs[i][9]
+                yaw = self.rpy[i][2]
                 print("absolute yaw =", np.degrees(yaw),"°")
                 rot_mat = np.array([[np.cos(yaw) ,-np.sin(yaw) , 0.0],  
                                     [np.sin(yaw) , np.cos(yaw) , 0.0],                                           
-                                    [-1.0        , 0.0         , 1.0]])
+                                    [0.0        , 0.0         , 1.0]])
                 ABSOLUTE_FRAME_VEL = np.dot(RELATIVE_FRAME_VEL[i], rot_mat.T )
                 collision=np.nonzero(droni_nelle_vicinanze[:,i:i+1]==2)[0]  
                 ### STATO 5 CESSIONE PRECEDENZA ###
@@ -202,39 +206,11 @@ class MapAviary(ProjAviary):
                         if self.WFSTATE[j] == 4:
                             precedenza_speciale = True
                             break                        
-                    if self.memory_position[i][2] == 0:
-                        self.memory_position[i][0:3] = self.pos[i]
-                        self.memory_position[i][3:6] = self.rpy[i]
-                        if min(self.observation[i][0], self.observation[i][2]) >= max(self.observation[i][3], self.observation[i][1]):
-                        # se sia la distanza frontale che dietro sono maggiori di entrambe le laterali
-                            self.RELATIVE_FRAME_DIRECTION = [0. , 1. ,1.]
-                            if self.observation[i][3] <= self.observation[i][1] :
-                                if  self.observation[i][3] < 1.5:
-                                    self.spostamento_laterale =  -np.abs(self.observation[i][3] - 0.40)
-                                else:
-                                    self.spostamento_laterale = -0.3
-                            else : 
-                                if self.observation[i][1] < 1.5 :
-                                    self.spostamento_laterale =  +np.abs(self.observation[i][1] - 0.4)
-                                else:
-                                    self.spostamento_laterale = +0.3
-                        elif self.observation[i][0] >=self.observation[i][2] :  
-                            self.RELATIVE_FRAME_DIRECTION = [-1. ,  0. ,1.]
-                            if  self.observation[i][3] < 1.5:
-                                self.spostamento_laterale =  np.abs(self.observation[i][2] - 0.40)
-                            else:
-                                self.spostamento_laterale = 0.3
-                        else:
-                            self.RELATIVE_FRAME_DIRECTION = [1. ,  0. ,1.]
-                            if  self.observation[i][3] < 1.5:
-                                self.spostamento_laterale =  np.abs(self.observation[i][0] - 0.40)
-                            else:
-                                self.spostamento_laterale = 0.3
                     if self.memory_state[i] == -1 : #se il drone è nello stato di inizio missione permane nella posizione in attesa di partire
 
-                        TARGET_POS[i][0] =  self.memory_position[i][0] 
-                        TARGET_POS[i][1] =  self.memory_position[i][1] 
-                        TARGET_POS[i][2] =  self.memory_position[i][2]
+                        TARGET_POS[i] =  self.waiting_position[i]
+                        #TARGET_POS[i][1] =  self.memory_position[i][1] 
+                        #TARGET_POS[i][2] =  self.memory_position[i][2]
 
                         TARGET_RPY[i][0] = obs[i][7]    #self.memory_position[i][3]
                         TARGET_RPY[i][1] = obs[i][8]    #self.memory_position[i][4]
@@ -243,23 +219,20 @@ class MapAviary(ProjAviary):
                         TARGET_VEL[i] = np.array([0.0, 0.0, 0.0])
 
                     elif  precedenza_speciale:
-                        TARGET_POS[i][0] =  self.memory_position[i][0] 
-                        TARGET_POS[i][1] =  self.memory_position[i][1] 
-                        TARGET_POS[i][2] =  self.memory_position[i][2] + 0.5
-
+                        #TARGET_POS[i][0] =  self.memory_position[i][0] 
+                        #TARGET_POS[i][1] =  self.memory_position[i][1] 
+                        #TARGET_POS[i][2] =  self.memory_position[i][2] + 0.5
+                        TARGET_POS[i] =  self.waiting_position[i]
                         TARGET_RPY[i][0] = obs[i][7]    #self.memory_position[i][3]
                         TARGET_RPY[i][1] = obs[i][8]    #self.memory_position[i][4]
                         TARGET_RPY[i][2] = self.memory_position[i][5]    
 
                         TARGET_VEL[i] = np.array([0.0, 0.0, 0.0])
                     else :
-                        self.RELATIVE_FRAME_DIRECTION = self.RELATIVE_FRAME_DIRECTION/np.linalg.norm(self.RELATIVE_FRAME_DIRECTION)
-                        ABSOLUTE_FRAME_DIRECTION = np.dot(self.RELATIVE_FRAME_DIRECTION, rot_mat.T )  
-
-                        TARGET_POS[i][0] =  self.memory_position[i][0] + self.spostamento_laterale* ABSOLUTE_FRAME_DIRECTION[0]
-                        TARGET_POS[i][1] =  self.memory_position[i][1] + self.spostamento_laterale *ABSOLUTE_FRAME_DIRECTION[1]
-                        TARGET_POS[i][2] =  self.memory_position[i][2] + 0.3 * ABSOLUTE_FRAME_DIRECTION[2]
-                        
+                        #TARGET_POS[i][0] =  self.memory_position[i][0] + self.spostamento_laterale* ABSOLUTE_FRAME_DIRECTION[0]
+                        #TARGET_POS[i][1] =  self.memory_position[i][1] + self.spostamento_laterale *ABSOLUTE_FRAME_DIRECTION[1]
+                        #TARGET_POS[i][2] =  self.memory_position[i][2] + 0.3 * ABSOLUTE_FRAME_DIRECTION[2]
+                        TARGET_POS[i] =  self.waiting_position[i]
                         TARGET_RPY[i][0] = obs[i][7]    #self.memory_position[i][3]
                         TARGET_RPY[i][1] = obs[i][8]    #self.memory_position[i][4]
                         TARGET_RPY[i][2] = self.memory_position[i][5] 
@@ -793,7 +766,8 @@ class MapAviary(ProjAviary):
             if new_WFSTATE == 5 and old_WFSTATE != 6 : 
                 self.memory_position[nth_drone][0:3] = self.pos[nth_drone]
                 self.memory_position[nth_drone][3:6] = self.rpy[nth_drone]
-                self.memory_state[nth_drone] = old_WFSTATE                
+                self.memory_state[nth_drone] = old_WFSTATE
+                self.waiting_position[nth_drone] = self.determine_waiting_position(nth_drone)             
     #### GESTISCE SCELTA RAGGIO DELLA CURVA state 2    
             if new_WFSTATE == 2:
                 if self.S_WF [nth_drone] == 1 :
@@ -814,6 +788,46 @@ class MapAviary(ProjAviary):
             print("ha tentato di cambiare stato 2 volte nello stesso step")
 
     ################################################################################
+
+    def determine_waiting_position(self,
+                                   nth_drone):
+        """
+        determina la posizione di attesa di un drone che deve cedere precedenza
+        si basa sulla posizione attuale del drone e sui range finders e somma alla posizione corrente un certo displacement
+        Deve andare in alto di un certo valore e laterale di un certo valore
+        Guarda i 4 valori dei range finders laterali (rF, rL, rB, rR) e decide la direzione laterale in base al minore di questi valori
+        Returns
+        --------
+        waiting_position : ndarray - [float float float] 
+            (3)-shaped array che contiene la posizione in cui drone deve attendere
+        """
+        current_pos = self.pos[nth_drone]
+        rF = self.observation[nth_drone][0]  # Range Finder frontale
+        rL = self.observation[nth_drone][1]  # Range Finder sinistro
+        rB = self.observation[nth_drone][2]  # Range Finder posteriore
+        rR = self.observation[nth_drone][3]  # Range Finder destro
+        min_range_value = min(rF, rL, rB, rR)
+        vertical_displacement = 0.5  # Spostamento in alto
+        lateral_displacement = min_range_value/2  # Spostamento laterale
+
+        if min_range_value == rF:
+            horizontal_displacement = np.array([lateral_displacement , 0.0 , 0.0])  # Spostamento davanti
+        elif min_range_value == rL:
+            horizontal_displacement = np.array([0.0, lateral_displacement, 0.0])  # Spostamento verso sinistra
+        elif min_range_value == rB:
+            horizontal_displacement = np.array([-lateral_displacement , 0.0 , 0.0])  # Spostamento dietro
+        elif min_range_value == rR:
+            horizontal_displacement = np.array([0.0, -lateral_displacement, 0.0])  # Spostamento verso destra
+        # rotazione
+        yaw = self.rpy[nth_drone][2]
+        rot_mat = np.array([[np.cos(yaw), -np.sin(yaw), 0.0],  
+                            [np.sin(yaw), np.cos(yaw), 0.0],                                           
+                            [0.0, 0.0, 1.0]])
+        #absolute_horizontal_displacement = np.dot(rot_mat, horizontal_displacement)
+        absolute_horizontal_displacement = np.dot(horizontal_displacement,rot_mat.T)
+        # Calcolare la posizione di attesa
+        waiting_position = current_pos + np.array([0.0, 0.0, vertical_displacement]) + absolute_horizontal_displacement
+        return waiting_position
 
     def _WallFollowingandAlign3(self,
                                 nth_drone):    #ALG B.2  versione con solo il sensore davanti, credo necessiti di un meccanismo di memoria
