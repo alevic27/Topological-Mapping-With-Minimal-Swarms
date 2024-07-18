@@ -974,12 +974,11 @@ class MapAviary(ProjAviary):
         """
         collision_treshold = 1.5*self.DIST_WALL_REF
         drones_position = np.array([self._getDroneStateVector(j)[0:3] for j  in range(self.NUM_DRONES)])
-        drone_velocity = self._getDroneStateVector(nth_drone)[10:13] 
         drones_distance =  np.array([[np.inf] for j in range(self.NUM_DRONES)] )
         collision =  np.array([[0] for j in range(self.NUM_DRONES)] )
 
         # drones_distance =  np.array([[[np.inf] for j in range(self.NUM_DRONES)] for j in range(self.NUM_DRONES)] )
-        # collision =  np.array([[[0.] for j in range(self.NUM_DRONES)] for j in range(self.NUM_DRONES)] )
+        # collision =  np.array([[[0] for j in range(self.NUM_DRONES)] for j in range(self.NUM_DRONES)] )
 
         for i in range(self.NUM_DRONES):
             if i!= nth_drone : #and self.WFSTATE[nth_drone]!=-1:
@@ -1394,14 +1393,17 @@ class MapAviary(ProjAviary):
             to_add_drone2 = []
             to_remove_balls = set()
             seen_coords = set()
-
+            already_merged1 = set()  # Set per tracciare i nodi già mergiati dal drone 1
+            already_merged2 = set()  # Set per tracciare i nodi già mergiati dal drone 2
             # Inizializza i contatori per il prossimo point_id
             k = 0
             for point_id_drone1, data1 in drone1_points.items():
                 for point_id_drone2, data2 in drone2_points.items():
-                    next_point_id_drone1 = self.get_next_point_id(drone1_id)
-                    next_point_id_drone2 = self.get_next_point_id(drone2_id)
-                    if 0.01 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold and data1['type']!='start' and data2['type']!='start':
+                    #next_point_id_drone1 = self.get_next_point_id(drone1_id)
+                    #next_point_id_drone2 = self.get_next_point_id(drone2_id)
+                    if 0.01 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold \
+                            and data1['type']!='start' and data2['type']!='start' \
+                            and point_id_drone1 not in already_merged1 and point_id_drone2 not in already_merged2:
                         new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist()
                         new_coords_tuple = tuple(new_coords)
                         # Accumula le chiavi da rimuovere a prescindere dall'aggiunta o no di un nuovo nodo mediato
@@ -1416,6 +1418,8 @@ class MapAviary(ProjAviary):
                             if data1['type'] == 'junction' or data2['type'] == 'junction':
                                 new_type = 'junction'
                             # Incrementa i contatori
+                            next_point_id_drone1 = self.get_next_point_id(drone1_id)
+                            next_point_id_drone2 = self.get_next_point_id(drone2_id)
                             next_point_id_drone1 = self.increment_point_id(next_point_id_drone1, k)
                             next_point_id_drone2 = self.increment_point_id(next_point_id_drone2, k)
                             k += 1
@@ -1429,6 +1433,9 @@ class MapAviary(ProjAviary):
                             self.adjacency_matrices[drone2_id] = self.replace_node_in_adjacency_matrix(self.adjacency_matrices[drone2_id], point_id_drone2, next_point_id_drone2)
                             # Aggiungi le nuove coordinate a seen_coords
                             seen_coords.add(new_coords_tuple)
+                            # Aggiungi i nodi già mergiati ai set
+                            already_merged1.add(point_id_drone1)
+                            already_merged2.add(point_id_drone2)
 
             # Rimuovi le vecchie istanze e le vecchie palline
             to_remove_drone1 = set(to_remove_drone1) # evita ripetizioni
