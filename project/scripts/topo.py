@@ -10,7 +10,7 @@ from shapely.geometry import Point, Polygon
 from shapely.ops import unary_union
 
 from gym_pybullet_drones.utils.Logger import Logger
-from project.envs.MapAviary import MapAviary
+from project.envs.MapAviary_gab2 import MapAviary
 from project.assets.assets_list import Labyrinth, LABYRINTH_CONFIG
 from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
 from gym_pybullet_drones.utils.utils import sync, str2bool
@@ -32,7 +32,7 @@ DEFAULT_GUI = True
 DEFAULT_PLOT = True
 DEFAULT_SIMULATION_FREQ_HZ = 240
 DEFAULT_CONTROL_FREQ_HZ = 48
-DEFAULT_DURATION_SEC = 300
+DEFAULT_DURATION_SEC = 500
 
 DEFAULT_IMG_RES = np.array([64, 48])
 
@@ -41,8 +41,9 @@ DEFAULT_SENSORS_RANGE = 4.
 
 ##### SCELTA LABIRINTO tra:
 # DOUBLE_T
-# DOUBLE_T_2X
-DEFAULT_LABYRINTH_ID = Labyrinth.DOUBLE_T #modificare solo questa riga
+# DOUBLE_T_2X raddoppiato corridoi larghi
+# DOUBLE_T_V2 raddoppiato corridoi stretti
+DEFAULT_LABYRINTH_ID = Labyrinth.DOUBLE_T_V2 #modificare solo questa riga
 # Configurazione del labirinto selezionato
 selected_config = LABYRINTH_CONFIG[DEFAULT_LABYRINTH_ID]
 DEFAULT_MAP_POLYGON = selected_config["polygon"]
@@ -59,7 +60,7 @@ DEFAULT_CONTROL_OMEGA : float = 0.5  #works with 0.5
 DEFAULT_CONTROL_VELOCITY: float = 0.2  #works with 0.2
 DEFAULT_WFSTATE : int = -1
 DEFAULT_THRESHOLD_DISTANCE : float = 0.03
-DEFAULT_DRONES_TIME_BEFORE_RETURN = 300
+DEFAULT_DRONES_TIME_BEFORE_RETURN = 120
 
 DEFAULT_MERGING_GRAPHS_LOGIC = True
 DEFAULT_MAX_DISTANCE_BETWEEN_NODES = 0.6 # 0.6 
@@ -99,25 +100,26 @@ def run(
     
     ### definisci le posizioni iniziali dei droni
     #posizione e attitude iniziale per ogni drone 
+
     INIT_XYZS = np.array([
-        [-3.0, 0., 1.0]
-    ])
-    INIT_XYZS = np.array([
-         [-0.5, 0., 1.0],
-         [-0.9, 0., 1.0],
-         [-1.3, 0., 1.0],
-         [-1.8, 0., 1.0]
+         [-1.5, 0., 1.8],
+         [-1.8, 0., 1.8],
+         [-2.1, 0., 1.8],
+         [-2.4, 0., 1.8]
         ])
+    #INIT_XYZS = np.array([
+    #    [-1.5, 0., 1.0]
+    #])
     INIT_XYZS += STARTING_COORDS_OFFSET
-    INIT_RPYS = np.array([
-        [0., 0., -0.5]
-        ])
     INIT_RPYS = np.array([
         [0., 0., 0.],
         [0., 0., 0.],
         [0., 0., 0.],
         [0., 0., 0.]
         ])
+    #INIT_RPYS = np.array([
+    #    [0., 0., 0.]
+    #    ])
 
     #INIT_XYZS = np.array([
     #    [-3.2, 0., 1.2]
