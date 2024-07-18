@@ -114,6 +114,14 @@ total_area_polygon = Polygon(new_coords)
 print("l'area totale è: ",total_area_polygon.area)
 env = DroneMissionEvaluator(total_area_polygon)
 env.drones_db = {
+    0: {
+        '0001': {'coords': [0, 0], 'type': 'corridor'},
+        '0002': {'coords': [2.5, 4.0], 'type': 'corridor'},
+        '0003': {'coords': [-2.5, 4.0], 'type': 'corridor'},
+        '0004': {'coords': [0, 4.0], 'type': 'corridor'},
+        
+        # Aggiungi altri nodi se necessario
+    },
     1: {
         '0001': {'coords': [0, 0], 'type': 'corridor'},
         '0002': {'coords': [2.5, 4.0], 'type': 'corridor'},

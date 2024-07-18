@@ -1,0 +1,18 @@
+        ######### 0-STATE debugger, starta solo se non sono uscito da 0 per nessun altro motivo #####
+        ######### TODO: da rifare con lo spost laterale
+                #print("angolo di debug in gradi:" , np.degrees(self.wfstate0_YAW_counter[i][0]),"°")
+                #if abs(self.wfstate0_YAW_counter[i][0]) < 2*np.pi : # ancora non giro completo
+                #    if rF < self.wfstate0_YAW_counter[i][1]: # se il mio front-range è minore del minore rolevato finora
+                #        self.wfstate0_YAW_counter[i][1] = rF # ci metto la distanza frontale
+                #        self.wfstate0_YAW_counter[i][2] = self.wfstate0_YAW_counter[i][0]
+                #else: 
+                #    if self.wfstate0_YAW_counter[i][1] > self.DIST_WALL_REF : # lontano
+                #        if np.abs( (self.wfstate0_YAW_counter[i][0] - (2*np.pi) ) - self.wfstate0_YAW_counter[i][2] ) < self.td*2 : 
+                #            self._SwitchWFSTATE(i, -1)
+                #            print("esco da WFSTATE = 0 per DEBUG troppo lontano e entro in WFSTATE = -1")
+                #    elif self.wfstate0_YAW_counter[i][1] < self.DIST_WALL_REF: #vicino
+                #        if np.abs( (self.wfstate0_YAW_counter[i][0]- (2*np.pi) ) - (self.wfstate0_YAW_counter[i][2] - (np.pi) ))  < self.td*2 :
+                #            self._SwitchWFSTATE(i, -1)
+                #            print("esco da WFSTATE = 0 per DEBUG troppo vicino e entro in WFSTATE = -1")
+                #    else:
+                #        print("ERROR NON DEBUGGA LO STATO 0")
