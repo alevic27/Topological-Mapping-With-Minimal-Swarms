@@ -166,7 +166,8 @@ class MapAviary(ProjAviary):
         self.wp_counters = np.array([[0] for i in range(num_drones)])  # contatore del prossimo WAYPOINT DA RAGGIUNGERE
     ################################################################################
 
-    def NextWP(self,obs,observation,INIT_XYS): #Aggiungere gli input necessari
+    def NextWP(self,obs,observation,INIT_XYZS): #Aggiungere gli input necessari
+
         """Definisce la logica di navigazione trovando il prossimo WP usando le funzioni:
         - _DecisionSystem
         - _WallFollowing()  , il quale chiama _WallFollowingAndAlign()
@@ -229,7 +230,7 @@ class MapAviary(ProjAviary):
 
                         TARGET_POS[i][0] =  self.memory_position[i][0] 
                         TARGET_POS[i][1] =  self.memory_position[i][1] 
-                        TARGET_POS[i][2] =  self.memory_position[i][2] 
+                        TARGET_POS[i][2] =  self.memory_position[i][2]
 
                         TARGET_RPY[i][0] = self.memory_position[i][3]
                         TARGET_RPY[i][1] = self.memory_position[i][4]   
@@ -323,19 +324,21 @@ class MapAviary(ProjAviary):
             (3)-shaped array con la velocità desiderata
         """
         if self.wp_counters[drone_id][0] == self.NUM_WP[drone_id][0]: # se ho raggiunto tutti i WAYPOINTS
+            wp_counter = self.wp_counters[drone_id][0]
+            waypoint_id = self.returning_paths[drone_id][wp_counter-1]
             target_pos = np.array(self.drones_db[drone_id][waypoint_id]['coords']) # mettici l'ultimo wp invece della pos
         else:
             wp_counter = self.wp_counters[drone_id][0]
             waypoint_id = self.returning_paths[drone_id][wp_counter] 
             target_pos = np.array(self.drones_db[drone_id][waypoint_id]['coords'])
-            #comparo il comando per vedere se è aggressivo (troppo lontano)
+            # comparo il comando per vedere se è aggressivo (troppo lontano)
             current_pos = self.pos[drone_id]
             direction_vector = target_pos - current_pos
             distance_to_target = np.linalg.norm(direction_vector)
+            self.update_wp_counter(drone_id,target_pos)
             if distance_to_target > max_step_distance: #se troppo lontano
                 direction_vector_normalized = direction_vector / distance_to_target
                 target_pos = current_pos + direction_vector_normalized * max_step_distance
-            self.update_wp_counter(drone_id,target_pos)
         return target_pos
     
     ################################################################################
@@ -343,7 +346,7 @@ class MapAviary(ProjAviary):
     def update_wp_counter(self,
                           drone_id,
                           target_pos,
-                          threshold=0.2): # TODO:tuning
+                          threshold=0.1): # TODO:tuning
         """
         Aggiorna il contatore dei waypoint per il drone specificato se il drone ha raggiunto il waypoint attuale.
 

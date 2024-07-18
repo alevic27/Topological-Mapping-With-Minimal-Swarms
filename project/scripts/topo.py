@@ -42,7 +42,7 @@ DEFAULT_SENSORS_RANGE = 4.
 ##### SCELTA LABIRINTO tra:
 # DOUBLE_T
 # DOUBLE_T_2X
-DEFAULT_LABYRINTH_ID = Labyrinth.DOUBLE_T_V2 #modificare solo questa riga
+DEFAULT_LABYRINTH_ID = Labyrinth.DOUBLE_T #modificare solo questa riga
 # Configurazione del labirinto selezionato
 selected_config = LABYRINTH_CONFIG[DEFAULT_LABYRINTH_ID]
 DEFAULT_MAP_POLYGON = selected_config["polygon"]
@@ -59,7 +59,7 @@ DEFAULT_CONTROL_OMEGA : float = 0.5  #works with 0.5
 DEFAULT_CONTROL_VELOCITY: float = 0.2  #works with 0.2
 DEFAULT_WFSTATE : int = -1
 DEFAULT_THRESHOLD_DISTANCE : float = 0.03
-DEFAULT_DRONES_TIME_BEFORE_RETURN = 240
+DEFAULT_DRONES_TIME_BEFORE_RETURN = 40
 
 DEFAULT_MERGING_GRAPHS_LOGIC = True
 DEFAULT_MAX_DISTANCE_BETWEEN_NODES = 0.6 # 0.6 
@@ -195,7 +195,8 @@ def run(
         obs, observation, reward, terminated, truncated, info = env.step(action)
 
         #### Compute control for the current way point #############
-        TARGET_POS , TARGET_RPY , TARGET_VEL , TARGET_RPY_RATES = env.NextWP(obs,observation,INIT_XYZS )       
+        TARGET_POS , TARGET_RPY , TARGET_VEL , TARGET_RPY_RATES = env.NextWP(obs,observation, INIT_XYZS)       
+
 
         # velocity control PLACEHOLDER #TO BE IMPLEMENTED
         #TARGET_VEL , TARGET_RPY_RATES = env.NextWP_VEL(obs,observation) #
