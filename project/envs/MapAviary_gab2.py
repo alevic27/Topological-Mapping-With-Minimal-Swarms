@@ -1875,7 +1875,7 @@ class MapAviary(ProjAviary):
         # Traccia l'area totale del labirinto
         rotated_total_area = rotate(total_area_polygon, 90, origin=(0, 0))
         x, y = rotated_total_area.exterior.xy
-        ax.plot(x, y, label='Total Area')
+        ax.plot(x, y, label='Total Area', color='black')
 
         for drone_id, points in self.drones_db.items():
             for point_id, data in points.items():
@@ -1885,16 +1885,16 @@ class MapAviary(ProjAviary):
                 rotated_buffer = rotate(buffer, 90, origin=(0, 0))
                 if rotated_buffer.geom_type == 'Polygon':
                     x, y = rotated_buffer.exterior.xy
-                    ax.plot(x, y, label=f'Buffer {point_id}')
+                    ax.fill(x, y, color='red', alpha=0.5, label=f'Buffer {point_id}')
                 elif rotated_buffer.geom_type == 'MultiPolygon':
                     for poly in rotated_buffer:
                         x, y = poly.exterior.xy
-                        ax.plot(x, y, label=f'Buffer {point_id}')
+                        ax.fill(x, y, color='red', alpha=0.5, label=f'Buffer {point_id}')
                 else:
                     rotated_point = rotate(point, 90, origin=(0, 0))
-                    ax.plot(rotated_point.x, rotated_point.y, 'o', label=f'Buffer {point_id}')
+                    ax.plot(rotated_point.x, rotated_point.y, 'o', color='red', label=f'Buffer {point_id}')
 
-            # Imposta le etichette degli assi
+        # Imposta le etichette degli assi
         plt.xlabel('y')
         plt.ylabel('x')
         plt.title('Coverage Area')
