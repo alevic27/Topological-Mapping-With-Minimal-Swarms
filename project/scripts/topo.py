@@ -10,7 +10,7 @@ from shapely.geometry import Point, Polygon
 from shapely.ops import unary_union
 
 from gym_pybullet_drones.utils.Logger import Logger
-from project.envs.MapAviary import MapAviary
+from project.envs.MapAviary_gab2 import MapAviary
 from project.assets.assets_list import Labyrinth, LABYRINTH_CONFIG
 from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
 from gym_pybullet_drones.utils.utils import sync, str2bool
@@ -26,7 +26,7 @@ DEFAULT_ACT = ActionType('one_d_rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' o
 DEFAULT_AGENTS = 2
 
 DEFAULT_DRONES = DroneModel("cf2x")
-DEFAULT_NUM_DRONES = 4
+DEFAULT_NUM_DRONES = 1
 DEFAULT_PHYSICS = Physics("pyb")
 DEFAULT_GUI = True
 DEFAULT_PLOT = True
@@ -99,23 +99,24 @@ def run(
     
     ### definisci le posizioni iniziali dei droni
     #posizione e attitude iniziale per ogni drone 
-    INIT_XYZS = np.array([
-        [-3.0, 0., 1.0]
-    ])
+
     INIT_XYZS = np.array([
          [-1.5, 0., 1.0],
          [-1.8, 0., 1.0],
          [-2.0, 0., 1.0],
          [-2.3, 0., 1.0]
         ])
+    INIT_XYZS = np.array([
+        [-1.5, 0., 1.0]
+    ])
     INIT_XYZS += STARTING_COORDS_OFFSET
     INIT_RPYS = np.array([
-        [0., 0., -0.5]
+        [0., 0., 0.],
+        [0., 0., 0.],
+        [0., 0., 0.],
+        [0., 0., 0.]
         ])
     INIT_RPYS = np.array([
-        [0., 0., 0.],
-        [0., 0., 0.],
-        [0., 0., 0.],
         [0., 0., 0.]
         ])
 

@@ -140,6 +140,7 @@ class MapAviary(ProjAviary):
         self.WF_ref_angle = np.array([[0.] for j in range(self.NUM_DRONES)] ) # yaw di riferimento di start dello stato 1 per non allontanarsi troppo dalla direzione parallela
         self.memory_state = np.array([[np.inf] for j in range(self.NUM_DRONES)] ) # memory dello stato in cui ci strova prima di una collision
         self.memory_position = np.array([[0. , 0. ,0. , 0. ,0. ,0.] for j in range(self.NUM_DRONES)] )
+        ## variabili collision avoidance
         self.drones_distance_pre = np.array([[0.] for j in range(self.NUM_DRONES)] )
         ## variabili database 
         self.drones_db = {} 
@@ -168,7 +169,6 @@ class MapAviary(ProjAviary):
     ################################################################################
 
     def NextWP(self,obs,observation,INIT_XYZS): #Aggiungere gli input necessari
-
         """Definisce la logica di navigazione trovando il prossimo WP usando le funzioni:
         - _DecisionSystem
         - _WallFollowing()  , il quale chiama _WallFollowingAndAlign()
@@ -942,6 +942,9 @@ class MapAviary(ProjAviary):
         drones_distance =  np.array([[np.inf] for j in range(self.NUM_DRONES)] )
         collision =  np.array([[0] for j in range(self.NUM_DRONES)] )
 
+        # drones_distance =  np.array([[[np.inf] for j in range(self.NUM_DRONES)] for j in range(self.NUM_DRONES)] )
+        # collision =  np.array([[[0.] for j in range(self.NUM_DRONES)] for j in range(self.NUM_DRONES)] )
+
         for i in range(self.NUM_DRONES):
             if i!= nth_drone : #and self.WFSTATE[nth_drone]!=-1:
                 relative_position = drones_position[i] - drones_position[nth_drone]
@@ -1335,7 +1338,7 @@ class MapAviary(ProjAviary):
                                        drone1_id,
                                        drone2_id,
                                        threshold=0.58,
-                                       threshold_2=0.1):
+                                       threshold_2=0.01):
         """ confronto incrociato tra i nodi di 2 droni diversi e sostituisce con la media
         Parameters
         -------
@@ -1362,7 +1365,7 @@ class MapAviary(ProjAviary):
                 for point_id_drone2, data2 in drone2_points.items():
                     next_point_id_drone1 = self.get_next_point_id(drone1_id)
                     next_point_id_drone2 = self.get_next_point_id(drone2_id)
-                    if 0.1 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold and data1['type']!='start' and data2['type']!='start':
+                    if 0.01 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold and data1['type']!='start' and data2['type']!='start':
                         new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist()
                         new_coords_tuple = tuple(new_coords)
                         # Accumula le chiavi da rimuovere a prescindere dall'aggiunta o no di un nuovo nodo mediato
