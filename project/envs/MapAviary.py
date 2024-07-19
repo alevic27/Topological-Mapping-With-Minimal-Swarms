@@ -346,12 +346,14 @@ class MapAviary(ProjAviary):
             time_passed = self.step_counter * self.PYB_TIMESTEP
             if time_passed >= self.MAXIMUM_BATTERY_TIME:
                 self.TIME_IS_OUT = True
-                self.plot_coverage(self.total_area_polygon, radius=0.75)  # Plotta la copertura totale
+                self.plot_coverage(self.total_area_polygon, radius=1)  # Plotta la copertura totale
                 self.returning_phase_paths_planning()
             
         print(f"La percentuale totale di esplorazione è: {self.total_coverage_percent:.2f}%")
         for i, coverage in enumerate(self.single_drone_coverage_percent):
             print(f"La percentuale di esplorazione del drone {i+1} è: {coverage:.2f}%")
+        if self.COVERAGE_IS_ENOUGH == True:
+            print(f"Il tempo impiegato a completare la missione è: {self.efficiency:.2f} s")
         return TARGET_POS, TARGET_RPY, TARGET_VEL, TARGET_RPY_RATES
 
     def waypoint_nav(self,
@@ -576,7 +578,7 @@ class MapAviary(ProjAviary):
                 vel [i] = np.dot(  2*cv , [1. , 0. , 0.] ) 
                 omega[i] = self._WallFollowingandAlign3(i)  
                 self.state1counter[i][0] += 1
-                if rF < 0.9*self.DIST_WALL_REF: #se il muro frontale è pericolosamente troppo vicino 
+                if rF < 0.8*self.DIST_WALL_REF: #se il muro frontale è pericolosamente troppo vicino 
                     self._SwitchWFSTATE(i, 0)
                     print("esco da WFSTATE = 1 (MURO FRONTALE TROPPO VICINO) e entro in WFSTATE = 0")
                 if self.S_WF[i][0] == 1: # wallfollowing con muro a destra
@@ -591,9 +593,9 @@ class MapAviary(ProjAviary):
                         elif self.MOVE_FORWARD[i][0] == False or self.state1counter[i][0]>120 : 
                             self._SwitchWFSTATE(i, 4) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
                             print("esco da WFSTATE = 1 e entro in WFSTATE = 4")
-                    # elif np.abs(rR- self.DIST_WALL_REF) < 0.5*self.td:
-                    #     self._SwitchWFSTATE(i, 0)
-                    #     print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono troppo vicino")
+                    elif rR < 0.6 * self.DIST_WALL_REF:
+                        self._SwitchWFSTATE(i, 0)
+                        print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono troppo vicino al muro laterale")
                 elif self.S_WF[i][0] == -1: # wallfollowing con muro a sinistra
                     if np.abs(rF - self.DIST_WALL_REF) < 5*self.td and np.abs(rL - self.DIST_WALL_REF) < 8*self.td :
                         self._SwitchWFSTATE(i, 0)
@@ -606,9 +608,9 @@ class MapAviary(ProjAviary):
                         elif self.MOVE_FORWARD[i][0] == False or self.state1counter[i][0]>120 :
                             self._SwitchWFSTATE(i, 4) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
                             print("esco da WFSTATE = 1 e entro in WFSTATE = 4")
-                        #elif rR - self.DIST_WALL_REF < 0.5*self.td:
-                        #     self._SwitchWFSTATE(i, 0)
-                        #     print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono troppo vicino")
+                    elif rL < 0.6 * self.DIST_WALL_REF:
+                         self._SwitchWFSTATE(i, 0)
+                         print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono troppo vicino al muro laterale")
                 ###### Topological
                 if self.state1counter[i][0] == 120: # era 100 ; TODO: aggiungi che lo fa anche se capisce di essere in junction
                     self.add_point(i,self.pos[i],'corridor')
@@ -628,7 +630,7 @@ class MapAviary(ProjAviary):
                         if self.prev_rR[i][0] != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.001:
                             self._SwitchWFSTATE(i, 0)
                             print("esco da WFSTATE = 2 e entro in WFSTATE = 0 poichè sono abbastanza allineato col muro")
-                        #if np.abs(rR - self.prev_rR[i][0]) > 0.5 or rR == self.MAX_RANGE:
+                        #if np.abs(rR - self.prev_rR[i][0]) > 0.5 or rR == self.MAX_RANGE:  # forse commentabile
                         #   self._SwitchWFSTATE(i, 3)
                         if rF<self.DIST_WALL_REF:
                            self._SwitchWFSTATE(i, 0)
@@ -637,7 +639,7 @@ class MapAviary(ProjAviary):
                         if self.prev_rL[i][0] != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.001 : # 0.0015 era bono
                             self._SwitchWFSTATE(i, 0)
                             print("esco da WFSTATE = 2 e entro in WFSTATE = 0 poichè sono abbastanza allineato col muro")
-                        #if np.abs(rL - self.prev_rL[i][0]) > 0.5 or rL == self.MAX_RANGE:
+                        #if np.abs(rL - self.prev_rL[i][0]) > 0.5 or rL == self.MAX_RANGE: # forse commentabile
                         #    self._SwitchWFSTATE(i, 3)
                         if rF< self.DIST_WALL_REF:
                            self._SwitchWFSTATE(i, 0)
@@ -729,7 +731,7 @@ class MapAviary(ProjAviary):
                         self.state5counter[i][0] += 1
                         if self.state5counter[i][0] > 50 :
                             self._SwitchWFSTATE(i, 6)
-                    else: # se ha superiori
+                    else: #se ha superiori
                         self.state5counter[i][0] = 0
         ######################  STATO 6 : USCITA DAL COLLISION AVOIDANCE  ############################
             elif self.WFSTATE[i][0] == 6:
@@ -739,7 +741,7 @@ class MapAviary(ProjAviary):
                     print(self.state6counter[i][0])
                     if  len(superiors)!= 0:
                         self._SwitchWFSTATE(i, 5)
-                    elif self.state6counter[i][0] > 50:
+                    elif self.state6counter[i][0] > 50 :
                          self._SwitchWFSTATE(i, self.memory_state[i][0])
                          #self.memory_state[i] = np.inf
             print("vel=", vel[i])
