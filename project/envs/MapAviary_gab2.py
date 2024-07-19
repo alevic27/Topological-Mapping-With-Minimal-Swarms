@@ -593,7 +593,10 @@ class MapAviary(ProjAviary):
         ### possibili migliorie:
         ###                    
             elif self.WFSTATE[i][0] == 3:
-                self.state3counter[i][0] += 1 
+                self.state3counter[i][0] += 1
+                if rR < 0.3 * self.DIST_WALL_REF or rL < 0.3 * self.DIST_WALL_REF or rF < 0.3 * self.DIST_WALL_REF:
+                    self._SwitchWFSTATE(i, 0)
+                    print("esco da WFSTATE = 3 e entro in WFSTATE = 0 poichè sono troppo vicino a un muro")
                 if self.S_WF[i][0] == 1: # wallfollowing con muro a destra
                     if  (np.abs(rR - self.prev_rR[i][0])  > 0.5 or rR == self.MAX_RANGE) and self.state3counter[i][0] < 120 :
                     # if  (np.abs(rR - self.DIST_WALL_REF)  > 0.5) and self.state3counter[i][0] < 120 :
@@ -1845,6 +1848,10 @@ class MapAviary(ProjAviary):
                 self.COVERAGE_IS_ENOUGH == False:
             self.efficiency = self.step_counter*self.PYB_TIMESTEP
             self.COVERAGE_IS_ENOUGH = True
+            print(f"La percentuale totale di esplorazione è: {self.total_coverage_percent:.2f}%")
+            for i, coverage in enumerate(self.single_drone_coverage_percent):
+                print(f"La percentuale di esplorazione del drone {i+1} è: {coverage:.2f}%")
+            print(f"Il tempo impiegato a completare la missione è: {self.efficiency:.2f} s")
             self.plot_coverage(self.total_area_polygon, radius) #TODO: vedere come deve esssere l'input EVALUATOR
             self.returning_phase_paths_planning()
 

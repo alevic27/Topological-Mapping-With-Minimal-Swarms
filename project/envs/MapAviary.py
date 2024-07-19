@@ -1897,6 +1897,10 @@ class MapAviary(ProjAviary):
                 self.COVERAGE_IS_ENOUGH == False:
             self.efficiency = self.step_counter*self.PYB_TIMESTEP
             self.COVERAGE_IS_ENOUGH = True
+            print(f"La percentuale totale di esplorazione è: {self.total_coverage_percent:.2f}%")
+            for i, coverage in enumerate(self.single_drone_coverage_percent):
+                print(f"La percentuale di esplorazione del drone {i+1} è: {coverage:.2f}%")
+            print(f"Il tempo impiegato a completare la missione è: {self.efficiency:.2f} s")
             self.plot_coverage(self.total_area_polygon, radius) #TODO: vedere come deve esssere l'input EVALUATOR
             self.returning_phase_paths_planning()
 
