@@ -591,13 +591,13 @@ class MapAviary(ProjAviary):
                         elif self.MOVE_FORWARD[i][0] == False or self.state1counter[i][0]>120 : 
                             self._SwitchWFSTATE(i, 4) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
                             print("esco da WFSTATE = 1 e entro in WFSTATE = 4")
-                    # elif np.abs(rR- self.DIST_WALL_REF) < 0.5*self.td:
-                    #     self._SwitchWFSTATE(i, 0)
-                    #     print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono troppo vicino")
+                    elif rR < 0.6*self.DIST_WALL_REF:
+                        self._SwitchWFSTATE(i, 0)
+                        print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono troppo vicino")
                 elif self.S_WF[i][0] == -1: # wallfollowing con muro a sinistra
                     if np.abs(rF - self.DIST_WALL_REF) < 5*self.td and np.abs(rL - self.DIST_WALL_REF) < 8*self.td :
                         self._SwitchWFSTATE(i, 0)
-                        print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo")
+                        print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo al muro laterale")
                     if np.abs(self.prev_rL[i][0] - rL) > 1.5*self.td : #condizione con la storia di rR
                         turn_direction = self._decisionSystem(i)
                         if  turn_direction ==1 and self.MOVE_FORWARD[i][0] == False:
@@ -606,9 +606,9 @@ class MapAviary(ProjAviary):
                         elif self.MOVE_FORWARD[i][0] == False or self.state1counter[i][0]>120 :
                             self._SwitchWFSTATE(i, 4) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
                             print("esco da WFSTATE = 1 e entro in WFSTATE = 4")
-                        #elif rR - self.DIST_WALL_REF < 0.5*self.td:
-                        #     self._SwitchWFSTATE(i, 0)
-                        #     print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono troppo vicino")
+                    elif rL < 0.6*self.DIST_WALL_REF:
+                            self._SwitchWFSTATE(i, 0)
+                            print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono troppo vicino al muro laterale")
                 ###### Topological
                 if self.state1counter[i][0] == 120: # era 100 ; TODO: aggiungi che lo fa anche se capisce di essere in junction
                     self.add_point(i,self.pos[i],'corridor')
