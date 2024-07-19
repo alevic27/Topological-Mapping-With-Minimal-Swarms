@@ -16,7 +16,7 @@ LABYRINTH_CONFIG = {
         "polygon": Polygon([(3.0, 1.0), (1.0, 1.0), (1.0, 3.1), (2.9, 3.1), (2.9 , 4.9),(-2.9 , 4.9),(-2.9 , 3.1),
                                 (-1, 3.1), (-1, -3.1),(-2.9, -3.1),(-2.9, -4.9),(2.9, -4.9),
                                 (2.9 , -3.1),(1., -3.1),(1., -1.0),(3., -1.)]),
-        "starting_coords_offset": np.array([-0.5, 0.0, 0.0])
+        "starting_coords_offset": np.array([0.0, 0.0, 0.0])
     },
     Labyrinth.DOUBLE_T_2X: {
         "name": "Labirinto Doppia T scalato 2x in direzioni X e Y",
