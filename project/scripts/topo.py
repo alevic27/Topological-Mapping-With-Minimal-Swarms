@@ -10,7 +10,7 @@ from shapely.geometry import Point, Polygon
 from shapely.ops import unary_union
 
 from gym_pybullet_drones.utils.Logger import Logger
-from project.envs.MapAviary import MapAviary
+from project.envs.MapAviary_gab2 import MapAviary
 from project.assets.assets_list import Labyrinth, LABYRINTH_CONFIG
 from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
 from gym_pybullet_drones.utils.utils import sync, str2bool

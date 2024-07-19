@@ -1,4 +1,9 @@
 <robot name="labyr2t" version="1.0">
+  <joint name="EnteringWall_link_joint" type="fixed">
+    <origin rpy="0.00000 0.00000 0.00000" xyz="2.95000 0.00000 1.05000"/>
+    <parent link="floor_link"/>
+    <child link="EnteringWall_link"/>
+  </joint>
   <joint name="wall10_link_joint" type="fixed">
     <origin rpy="0.00000 0.00000 0.00000" xyz="-2.95000 -4.00000 1.05000"/>
     <parent link="floor_link"/>
@@ -74,6 +79,25 @@
     <parent link="floor_link"/>
     <child link="wall9_link"/>
   </joint>
+  <link name="EnteringWall_link">
+    <collision name="EnteringWall_collision">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <box size="0.10000 2.00000 2.00000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.66667" ixy="0.00000" ixz="0.00000" iyy="0.33417" iyz="0.00000" izz="0.33417"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <mass value="1.00000"/>
+    </inertial>
+    <visual name="EnteringWall">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <box size="0.10000 2.00000 2.00000"/>
+      </geometry>
+    </visual>
+  </link>
   <link name="floor_link">
     <collision name="floor_collision">
       <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
