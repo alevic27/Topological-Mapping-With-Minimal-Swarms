@@ -46,7 +46,9 @@ class MapAviary(ProjAviary):
                  max_distance_between_nodes=0.6,
                  total_area_polygon=Polygon([(0, 0), (2, 0), (2, 2), (4, 2), (4, 0), (6, 0), (6, 4), (0, 4)]),
                  point_coverage_radius=0.75,
-                 target_coverage=90,
+                 total_target_coverage=90,
+                 single_target_coverage=90,
+                 maximum_battery_time=300,
                  ):
         
         """Initialization of an environment with drones capable of performing topological mapping.
@@ -137,8 +139,15 @@ class MapAviary(ProjAviary):
         self.radius = np.array([[0.] for j in range(self.NUM_DRONES)] ) 
         self.WFSTATE_WAS_CHANGED = np.array([[False] for j in range(self.NUM_DRONES)] ) 
         self.WF_ref_angle = np.array([[0.] for j in range(self.NUM_DRONES)] ) # yaw di riferimento di start dello stato 1 per non allontanarsi troppo dalla direzione parallela
-        self.memory_state = np.array([[np.inf] for j in range(self.NUM_DRONES)] ) # memory dello stato in cui ci strova prima di una collision
+        self.memory_state = np.array([[9] for j in range(self.NUM_DRONES)] ) # memory dello stato in cui ci strova prima di una collision
         self.memory_position = np.array([[0. , 0. ,0. , 0. ,0. ,0.] for j in range(self.NUM_DRONES)] )
+        self.WF_height = np.array([[0.] for j in range(self.NUM_DRONES)] )
+        for i in range(self.NUM_DRONES):
+            self.memory_position[i][0:3] = initial_xyzs[i]
+            self.WF_height[i][0] = initial_xyzs[i][2]
+        self.waiting_position = initial_xyzs
+        ## variabili collision avoidance
+        self.drones_distance_pre = np.zeros((self.NUM_DRONES,self.NUM_DRONES))
         ## variabili database 
         self.drones_db = {} 
         self.adjacency_matrices = []
@@ -149,19 +158,24 @@ class MapAviary(ProjAviary):
         self.max_distance_between_nodes = max_distance_between_nodes
         ## variabili missione
         self.total_area_polygon = total_area_polygon
-        self.coverage_percent = 0 # percentuale di area coperta totale
+        self.total_coverage_percent = 0 # percentuale di area coperta totale
         self.single_drone_coverage_percent = [] # percentuale di area coperta totale singolamente dal jesimo drone
-        self.TARGET_COVERAGE = target_coverage
+        # fine missione con TARGET_COVERAGE
+        self.TOTAL_TARGET_COVERAGE = total_target_coverage
+        self.SINGLE_TARGET_COVERAGE = single_target_coverage
         self.point_coverage_radius = point_coverage_radius
         self.efficiency = 0 # appena il coverage_percent raggiunge il 90% viene salvato come valore temporale
         self.COVERAGE_IS_ENOUGH = False
+        # fine missione dopo tot tempo
+        self.MAXIMUM_BATTERY_TIME = maximum_battery_time
+        self.TIME_IS_OUT = False
         self.BLOCK_SIMULATION_WHEN_RETURNING_PHASE_STARTS = True
         self.returning_paths = {} # dizionario con i path di ritorno per tutti i droni
         self.NUM_WP = np.array([[0] for i in range(num_drones)])  # numero di WAYPOINTS del percorso di ritorno per ogni drone
         self.wp_counters = np.array([[0] for i in range(num_drones)])  # contatore del prossimo WAYPOINT DA RAGGIUNGERE
     ################################################################################
 
-    def NextWP(self,obs,observation): #Aggiungere gli input necessari
+    def NextWP(self,obs,observation,INIT_XYZS): #Aggiungere gli input necessari
         """Definisce la logica di navigazione trovando il prossimo WP usando le funzioni:
         - _DecisionSystem
         - _WallFollowing()  , il quale chiama _WallFollowingAndAlign()
@@ -175,95 +189,88 @@ class MapAviary(ProjAviary):
         TARGET_RPY_RATES = np.array([[0. , 0., 0.]for j in range(self.NUM_DRONES)])
         #self.S_WF=self._decisionSystem()  # controllare se aggiornare in self o no
 
-        if self.COVERAGE_IS_ENOUGH == False:
+        if self.COVERAGE_IS_ENOUGH == False and self.TIME_IS_OUT == False:
             TARGET_OMEGA, RELATIVE_FRAME_VEL , self.WFSTATE , self.S_WF, droni_nelle_vicinanze = self._WallFollowing3()
 
         for i in range(self.NUM_DRONES) :
-            if self.COVERAGE_IS_ENOUGH == False:  
-                yaw = obs[i][9]
+            ### NAVIGAZIONE WALLFOLLWING ###
+            if self.COVERAGE_IS_ENOUGH == False and self.TIME_IS_OUT == False: 
+                yaw = self.rpy[i][2]
                 print("absolute yaw =", np.degrees(yaw),"°")
                 rot_mat = np.array([[np.cos(yaw) ,-np.sin(yaw) , 0.0],  
                                     [np.sin(yaw) , np.cos(yaw) , 0.0],                                           
-                                    [-1.0        , 0.0         , 1.0]])
+                                    [0.0        , 0.0         , 1.0]])
                 ABSOLUTE_FRAME_VEL = np.dot(RELATIVE_FRAME_VEL[i], rot_mat.T )
                 collision=np.nonzero(droni_nelle_vicinanze[:,i:i+1]==2)[0]  
+                ### STATO 5 CESSIONE PRECEDENZA ###
                 if self.WFSTATE[i] == 5:
-                    precedenza_speciale = False
-                    for j in collision:
-                        if self.WFSTATE[j] == 4:
-                            precedenza_speciale = True
-                            break                        
-                    if self.memory_position[i][2] == 0:
-                        self.memory_position[i][0:3] = obs[i][0:3]
-                        self.memory_position[i][3:6] = obs[i][7:10]
-                        if self.observation[i][3] <= self.observation[i][1] :
-                            if  self.observation[i][3] < 1.5:
-                                self.spostamento_laterale =  -np.abs(self.observation[i][3] - 0.40)
-                            else:
-                                self.spostamento_laterale = -0.3
-                        else : 
-                            if self.observation[i][1] < 1.5 :
-                                self.spostamento_laterale =  +np.abs(self.observation[i][1] - 0.4)
-                            else:
-                                self.spostamento_laterale = +0.3
-
+                    #precedenza_speciale = False
+                    #for j in collision:
+                    #    if self.WFSTATE[j] == 4:
+                    #        precedenza_speciale = True
+                    #        break                        
                     if self.memory_state[i] == -1 : #se il drone è nello stato di inizio missione permane nella posizione in attesa di partire
 
-                        TARGET_POS[i][0] =  self.memory_position[i][0] 
-                        TARGET_POS[i][1] =  self.memory_position[i][1] 
-                        TARGET_POS[i][2] =  self.memory_position[i][2] 
+                        TARGET_POS[i] =  self.waiting_position[i]
+                        #TARGET_POS[i][0] =  self.memory_position[i][0] 
+                        #TARGET_POS[i][1] =  self.memory_position[i][1] 
+                        #TARGET_POS[i][2] =  self.memory_position[i][2]
 
-                        TARGET_RPY[i][0] = self.memory_position[i][3]
-                        TARGET_RPY[i][1] = self.memory_position[i][4]   
+                        TARGET_RPY[i][0] = obs[i][7]    #self.memory_position[i][3]
+                        TARGET_RPY[i][1] = obs[i][8]    #self.memory_position[i][4]
                         TARGET_RPY[i][2] = self.memory_position[i][5]
 
-                    elif  precedenza_speciale:
-                        TARGET_POS[i][0] =  self.memory_position[i][0] 
-                        TARGET_POS[i][1] =  self.memory_position[i][1] 
-                        TARGET_POS[i][2] =  self.memory_position[i][2] + 0.5
+                        TARGET_VEL[i] = np.array([0.0, 0.0, 0.0])
 
-                        TARGET_RPY[i][0] = self.memory_position[i][3]
-                        TARGET_RPY[i][1] = self.memory_position[i][4]   
-                        TARGET_RPY[i][2] = self.memory_position[i][5]    
+                    #elif  precedenza_speciale:
+                    #    #TARGET_POS[i][0] =  self.memory_position[i][0] 
+                    #    #TARGET_POS[i][1] =  self.memory_position[i][1] 
+                    #    #TARGET_POS[i][2] =  self.memory_position[i][2] + 0.5
+                    #    TARGET_POS[i] =  self.waiting_position[i]
+                    #    TARGET_RPY[i][0] = obs[i][7]    #self.memory_position[i][3]
+                    #    TARGET_RPY[i][1] = obs[i][8]    #self.memory_position[i][4]
+                    #    TARGET_RPY[i][2] = self.memory_position[i][5]    
+                    #
+                    #    TARGET_VEL[i] = np.array([0.0, 0.0, 0.0])
                     else :
-                        RELATIVE_FRAME_DIRECTION = [0. , 1. , 1. ]
-                        ABSOLUTE_FRAME_DIRECTION = np.dot(RELATIVE_FRAME_DIRECTION, rot_mat.T )  
-                        TARGET_POS[i][0] =  self.memory_position[i][0] + self.spostamento_laterale* ABSOLUTE_FRAME_DIRECTION[0]
-                        TARGET_POS[i][1] =  self.memory_position[i][1] + self.spostamento_laterale *ABSOLUTE_FRAME_DIRECTION[1]
-                        TARGET_POS[i][2] =  self.memory_position[i][2] + 0.3 * ABSOLUTE_FRAME_DIRECTION[2]
+                        TARGET_POS[i] =  self.waiting_position[i]
                         
-                        TARGET_RPY[i][0] = self.memory_position[i][3]
-                        TARGET_RPY[i][1] = self.memory_position[i][4]   
+                        TARGET_RPY[i][0] = obs[i][7]    #self.memory_position[i][3]
+                        TARGET_RPY[i][1] = obs[i][8]    #self.memory_position[i][4]
                         TARGET_RPY[i][2] = self.memory_position[i][5] 
 
+                        TARGET_VEL[i] = np.array([0.0, 0.0, 0.0])
+                ### STATO 6 RITORNO ALLA MEMORY POSITION ###
                 elif self.WFSTATE[i] == 6:
-                        TARGET_POS[i][0] =  self.memory_position[i][0] 
-                        TARGET_POS[i][1] =  self.memory_position[i][1] 
-                        TARGET_POS[i][2] =  self.memory_position[i][2] 
+                        TARGET_POS[i][0] = self.memory_position[i][0] 
+                        TARGET_POS[i][1] = self.memory_position[i][1] 
+                        TARGET_POS[i][2] = self.memory_position[i][2] 
 
-                        TARGET_RPY[i][0] = self.memory_position[i][3]
-                        TARGET_RPY[i][1] = self.memory_position[i][4]   
+                        TARGET_RPY[i][0] = obs[i][7]  #self.memory_position[i][3]
+                        TARGET_RPY[i][1] = obs[i][8]  #self.memory_position[i][4]   
                         TARGET_RPY[i][2] = self.memory_position[i][5]
+
+                        TARGET_VEL[i] = np.array([0.0, 0.0, 0.0])
+                ### STATI -1, 0, 1, 2, 3 e 4 #### 
                 else:
-                    if self.memory_position[i][2] != 0:
-                        self.memory_position[i] = np.array([0., 0., 0., 0. ,0. , 0.])
+                    #if self.memory_position[i][2] != 0:
+                    #    self.memory_position[i] = np.array([0., 0., 0., 0. ,0. , 0.])
                     TARGET_POS[i][0] = obs[i][0] + ABSOLUTE_FRAME_VEL[0] * time_step  
                     TARGET_POS[i][1] = obs[i][1] + ABSOLUTE_FRAME_VEL[1] * time_step 
-                    TARGET_POS[i][2] = obs[i][2] #+ ABSOLUTE_FRAME_VEL[2] * time_step 
+                    TARGET_POS[i][2] = self.WF_height[i][0] #+ ABSOLUTE_FRAME_VEL[2] * time_step 
 
                     TARGET_RPY[i][0] = obs[i][7]
                     TARGET_RPY[i][1] = obs[i][8]   
                     TARGET_RPY[i][2] = obs[i][9] #+ TARGET_OMEGA[i] * time_step # solo il terzo elemento
 
-                TARGET_VEL[i][0] = ABSOLUTE_FRAME_VEL[0]
-                TARGET_VEL[i][1] = ABSOLUTE_FRAME_VEL[1]
-                TARGET_VEL[i][2] = 0.
+                    TARGET_VEL[i][0] = ABSOLUTE_FRAME_VEL[0]
+                    TARGET_VEL[i][1] = ABSOLUTE_FRAME_VEL[1]
+                    TARGET_VEL[i][2] = 0.
 
-                TARGET_RPY_RATES[i][0] = 0.
-                TARGET_RPY_RATES[i][1] = 0.
-                TARGET_RPY_RATES[i][2] = TARGET_OMEGA[i]
+                    TARGET_RPY_RATES[i][0] = 0.
+                    TARGET_RPY_RATES[i][1] = 0.
+                    TARGET_RPY_RATES[i][2] = TARGET_OMEGA[i]
             else:
-
             ########## WAYPOINT ########
                 # usando wp_counters e NUM_WP, restituiti da 
                     #TARGET_POS[i] = NEXT_WP
@@ -273,16 +280,35 @@ class MapAviary(ProjAviary):
 
         for j in range(self.NUM_DRONES) : # saves actual mindist to distance[0]. It will be the prev_dist of next step
             self.distance[j][0] =  self.distance[j][1]
-        ### CALCOLO COVERAGE PER LA LOGICA DI FINE MISSIONE ###
-        self.coverage_percent = self.calculate_coverage(self.point_coverage_radius)
+        ### LOGICA DI FINE MISSIONE  ###
+        # fine missione coverage sufficiente
+        self.total_coverage_percent = self.calculate_coverage(self.point_coverage_radius)
         self.single_drone_coverage_percent = self.calculate_coverage_individually(self.point_coverage_radius)
-        print(f"La percentuale totale di esplorazione è: {self.coverage_percent:.2f}%")
+        self.end_mission(self.point_coverage_radius)
+        # fine missione tempo limite
+        if self.TIME_IS_OUT == False and self.COVERAGE_IS_ENOUGH == False:
+            time_passed = self.step_counter * self.PYB_TIMESTEP
+            if time_passed >= self.MAXIMUM_BATTERY_TIME:
+                self.TIME_IS_OUT = True
+                print(f"La missione è terminata per il tempo limite delle batterie di {self.MAXIMUM_BATTERY_TIME:.2f} s")
+                print(f"La percentuale totale di esplorazione è: {self.total_coverage_percent:.2f}%")
+                for i, coverage in enumerate(self.single_drone_coverage_percent):
+                    print(f"La percentuale di esplorazione del drone {i+1} è: {coverage:.2f}%")
+                self.plot_coverage(self.total_area_polygon, radius=1)  # Plotta la copertura totale
+                self.returning_phase_paths_planning()
+            
+        print(f"La percentuale totale di esplorazione è: {self.total_coverage_percent:.2f}%")
         for i, coverage in enumerate(self.single_drone_coverage_percent):
             print(f"La percentuale di esplorazione del drone {i+1} è: {coverage:.2f}%")
+        if self.COVERAGE_IS_ENOUGH == True:
+            print(f"Il tempo impiegato a completare la missione è: {self.efficiency:.2f} s")
+        if self.TIME_IS_OUT == True:
+            print(f"La missione è terminata per il tempo limite delle batterie di {self.MAXIMUM_BATTERY_TIME:.2f} s")
         return TARGET_POS, TARGET_RPY, TARGET_VEL, TARGET_RPY_RATES
 
     def waypoint_nav(self,
-                     drone_id):
+                     drone_id,
+                     max_step_distance=0.1):
         """
         Parametres
         --------
@@ -297,12 +323,21 @@ class MapAviary(ProjAviary):
             (3)-shaped array con la velocità desiderata
         """
         if self.wp_counters[drone_id][0] == self.NUM_WP[drone_id][0]: # se ho raggiunto tutti i WAYPOINTS
-            target_pos = self.pos[drone_id] # mettici l'ultimo wp invece della pos
+            wp_counter = self.wp_counters[drone_id][0]
+            waypoint_id = self.returning_paths[drone_id][wp_counter-1]
+            target_pos = np.array(self.drones_db[drone_id][waypoint_id]['coords']) # mettici l'ultimo wp invece della pos
         else:
             wp_counter = self.wp_counters[drone_id][0]
             waypoint_id = self.returning_paths[drone_id][wp_counter] 
             target_pos = np.array(self.drones_db[drone_id][waypoint_id]['coords'])
+            # comparo il comando per vedere se è aggressivo (troppo lontano)
+            current_pos = self.pos[drone_id]
+            direction_vector = target_pos - current_pos
+            distance_to_target = np.linalg.norm(direction_vector)
             self.update_wp_counter(drone_id,target_pos)
+            if distance_to_target > max_step_distance: #se troppo lontano
+                direction_vector_normalized = direction_vector / distance_to_target
+                target_pos = current_pos + direction_vector_normalized * max_step_distance
         return target_pos
     
     ################################################################################
@@ -310,7 +345,7 @@ class MapAviary(ProjAviary):
     def update_wp_counter(self,
                           drone_id,
                           target_pos,
-                          threshold=0.2): # TODO:tuning
+                          threshold=0.1): # TODO:tuning
         """
         Aggiorna il contatore dei waypoint per il drone specificato se il drone ha raggiunto il waypoint attuale.
 
@@ -335,6 +370,10 @@ class MapAviary(ProjAviary):
         """Definisce la logica di scelta della direzione da prendere dopo uno stop (dopo che becca muro)
            Imposta la direzione da prendere, cioè se destra o sinistra in base alla posizione dei droni, se questi sono davanti a lui e a destra
            girera verso sinistra, se sono dietro di lui e a sinistra girerà verso destra.
+           
+           Return
+           --------
+           qualcosa
         """
         drones_position = np.array([self._getDroneStateVector(j)[0:3] for j  in range(self.NUM_DRONES)])
         drones_distance = np.array([[np.inf] for j  in range(self.NUM_DRONES)])
@@ -346,7 +385,8 @@ class MapAviary(ProjAviary):
                 rot_mat = np.array(p.getMatrixFromQuaternion(self.quat[nth_drone, :])).reshape(3, 3) 
                 relative_position_rel= np.dot(relative_position,rot_mat) 
                 drones_distance[i] = self.euclidean_distance( drones_position[nth_drone][0:2], drones_position[i][0:2])
-                if relative_position_rel[0]>0 and drones_distance[i] < self.MAX_RANGE:
+                dir = np.arctan2(relative_position_rel[1],relative_position_rel[0])
+                if (dir < 3/4*np.pi and dir > -3/4*np.pi) and drones_distance[i] < 0 * self.MAX_RANGE:  #### MODIFICATO
                     if relative_position_rel[1]<=0 :
                         right_or_left[i] = 1 
                     else:
@@ -354,14 +394,14 @@ class MapAviary(ProjAviary):
         N_drones_right = len(np.nonzero(right_or_left==1)[0]) 
         N_drones_left = len(np.nonzero(right_or_left==2)[0])        
            
-        if N_drones_right > N_drones_left :
-                sWF = -1
-        elif N_drones_right < N_drones_left:
+        if N_drones_right > N_drones_left +1 :
                 sWF = 1
+        elif N_drones_left > N_drones_right +1:
+                sWF = -1
         else:
             sWF = random.choice([-1,1])
         print("scelta randomica",sWF)
-        return sWF
+        return sWF 
     
     ################################################################################
 
@@ -408,7 +448,7 @@ class MapAviary(ProjAviary):
             droni_nelle_vicinanze[:,i:i+1] = self.find_collision(i)
             superiors = np.nonzero(droni_nelle_vicinanze[:,i] == 2)[0]# indici 0based dei droni a cui devo la precedenza
             inferiors = np.nonzero(droni_nelle_vicinanze[:,i] == 1)[0] # indici 0based dei droni su cui ho la precedenza
-            if len(superiors) != 0 and self.WFSTATE[i] != 5 and self.WFSTATE[i] != 6:
+            if len(superiors) != 0 and self.WFSTATE[i] != 5 and self.WFSTATE[i] != 6 and self.WFSTATE[i] != -1:
                 self._SwitchWFSTATE(i, 5)
             # len(inferiors) è il numero di droni su cui ho precedenza
             # len(superiors) è il numero di droni a cui devo dare precedenza
@@ -424,128 +464,103 @@ class MapAviary(ProjAviary):
                 if self.S_WF[i][0] == 1: # wallfollowing con muro a destra
                     print("differenza tra range destro e range destro precedente: ",np.abs(rR - self.prev_rR[i][0]))
                     if self.IM_IN_A_CORNER[i][0] == True:
-                        if np.abs(rB - self.DIST_WALL_REF) < 8*self.td and np.abs(rR - self.DIST_WALL_REF) < 5*self.td: #and np.abs(rF - self.DIST_WALL_REF) > 10*self.td: # se dietro e destra so circa ar top
+                        if (np.abs(rB - self.DIST_WALL_REF) < 8*self.td and np.abs(rR - self.DIST_WALL_REF) < 5*self.td)\
+                                or (np.abs(self.wfstate0_YAW_counter[i][0]) > 0.8 and np.abs(rR - self.prev_rR[i][0]) < self.td*0.05): #and np.abs(rF - self.DIST_WALL_REF) > 10*self.td: # se dietro e destra so circa ar top
                             if rR != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.03 : # TODO: aggiusta sensibilità
-                                self._SwitchWFSTATE(i, 1)
+                                self._SwitchWFSTATE(i, 3)
                                 self.state1counter[i][0] = -80
-                                print("esco da WFSTATE = 0 (in un convesso) e entro in WFSTATE = 1")
+                                print("esco da WFSTATE = 0 (in un convesso) e entro in WFSTATE = 3")
                     elif self.MOVE_FORWARD[i][0] == True:
                         print ("l'angolo di curva accumulato è" , self.wfstate0_YAW_counter[i][0])
-                        if np.abs(self.wfstate0_YAW_counter[i][0]) > 0.8 and np.abs(rR - self.prev_rR[i][0]) < self.td*0.01: # se l
+                        if np.abs(self.wfstate0_YAW_counter[i][0]) > 0.8 and np.abs(rR - self.prev_rR[i][0]) < self.td*0.05: # era 0.01
                             #if np.abs(rR - self.DIST_WALL_REF) < self.td :
-                                self._SwitchWFSTATE(i, 1)
-                                print("esco da WFSTATE = 0 (ho un muro di fronte) e entro in WFSTATE = 1")
-                    elif rR != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.01  :  
+                                self._SwitchWFSTATE(i, 3)
+                                print("esco da WFSTATE = 0 (ho un muro di fronte) e entro in WFSTATE = 3")
+                    elif rR != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.1  :  # era 0.05
                         self._SwitchWFSTATE(i, 3)
                         print("esco da WFSTATE = 0 (causa parallelo al muro destro) e entro in WFSTATE = 3")
                 elif self.S_WF[i][0] == -1: # wallfollowing con muro a sinistra                    
                     print("differenza tra range sinistro e range sinistro precedente: ",np.abs(rL - self.prev_rL[i][0]))
                     if self.IM_IN_A_CORNER[i][0] == True:
-                        if np.abs(rB - self.DIST_WALL_REF) < 8*self.td and np.abs(rL - self.DIST_WALL_REF) < 5*self.td: #and np.abs(rF - self.DIST_WALL_REF) > 10*self.td: # se dietro e sinistra so circa ar top
+                        if (np.abs(rB - self.DIST_WALL_REF) < 8*self.td and np.abs(rL - self.DIST_WALL_REF) < 5*self.td)\
+                            or (np.abs(self.wfstate0_YAW_counter[i][0]) >0.8 and np.abs(rL - self.prev_rL[i][0]) < self.td*0.01): #and np.abs(rF - self.DIST_WALL_REF) > 10*self.td: # se dietro e sinistra so circa ar top
                             if rL != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.03 : # TODO: aggiusta sensibilità
-                                self._SwitchWFSTATE(i, 1)
+                                self._SwitchWFSTATE(i, 3)
                                 self.state1counter[i][0] = -80
                                 print("esco da WFSTATE = 0 (in un convesso) e entro in WFSTATE = 1")
                     elif self.MOVE_FORWARD[i][0] == True:
                         print ("l'angolo di curva accumulato è" , self.wfstate0_YAW_counter[i][0])
-                        if np.abs(self.wfstate0_YAW_counter[i][0]) >0.8 and np.abs(rL - self.prev_rL[i][0]) < self.td*0.01: # se l
+                        if np.abs(self.wfstate0_YAW_counter[i][0]) >0.8 and np.abs(rL - self.prev_rL[i][0]) < self.td*0.05: # era 0.01
                             #if np.abs(rL - self.DIST_WALL_REF) < self.td:
-                                self._SwitchWFSTATE(i, 1)
+                                self._SwitchWFSTATE(i, 3)
                                 print("esco da WFSTATE = 0 (ho un muro di fronte) e entro in WFSTATE = 1")
-                    elif rL != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.01 :    
+                    elif rL != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.1 :   # era 0.05 
                         self._SwitchWFSTATE(i, 3)
                         print("esco da WFSTATE = 0 (causa parallelo al muro sinistro) e entro in WFSTATE = 3")
-        ######### 0-STATE debugger, starta solo se non sono uscito da 0 per nessun altro motivo #####
-        ######### TODO: da rifare con lo spost laterale
-                #print("angolo di debug in gradi:" , np.degrees(self.wfstate0_YAW_counter[i][0]),"°")
-                #if abs(self.wfstate0_YAW_counter[i][0]) < 2*np.pi : # ancora non giro completo
-                #    if rF < self.wfstate0_YAW_counter[i][1]: # se il mio front-range è minore del minore rolevato finora
-                #        self.wfstate0_YAW_counter[i][1] = rF # ci metto la distanza frontale
-                #        self.wfstate0_YAW_counter[i][2] = self.wfstate0_YAW_counter[i][0]
-                #else: 
-                #    if self.wfstate0_YAW_counter[i][1] > self.DIST_WALL_REF : # lontano
-                #        if np.abs( (self.wfstate0_YAW_counter[i][0] - (2*np.pi) ) - self.wfstate0_YAW_counter[i][2] ) < self.td*2 : 
-                #            self._SwitchWFSTATE(i, -1)
-                #            print("esco da WFSTATE = 0 per DEBUG troppo lontano e entro in WFSTATE = -1")
-                #    elif self.wfstate0_YAW_counter[i][1] < self.DIST_WALL_REF: #vicino
-                #        if np.abs( (self.wfstate0_YAW_counter[i][0]- (2*np.pi) ) - (self.wfstate0_YAW_counter[i][2] - (np.pi) ))  < self.td*2 :
-                #            self._SwitchWFSTATE(i, -1)
-                #            print("esco da WFSTATE = 0 per DEBUG troppo vicino e entro in WFSTATE = -1")
-                #    else:
-                #        print("ERROR NON DEBUGGA LO STATO 0")
 
         ######################  STATO -1 : AVANZAMENTO LINEARE FINO A WALLREF  ############################
         ### stato di avanzamento lineare finchè la min dist non si avvicina alla DIST_WALL_REF
             if self.WFSTATE[i] == -1 : 
                 omega [i] = ([0])
-                vel [i] = np.dot(  cv , [1. , 0. , 0.] )
-        ### aggiunta nodo iniziale
-                if self.stateminus1counter[i] == -1:
-                    self.add_point(i,self.pos[i],'start')
-                self.stateminus1counter[i][0] += 1
-                if np.abs(rR - self.DIST_WALL_REF) > 1.5 or np.abs(rL - self.DIST_WALL_REF) > 1.5 : 
-                    if self.START[i] == 0:
-                        self.S_WF[i] = self._decisionSystem(i) #scelta randomica del muro da seguire   
-                    self.START[i] += 1
-                    print(self.START[i])
-                    if self.S_WF[i] == 1: #seguo il muro di destra
-                        if rR == self.MAX_RANGE:
-                                self._SwitchWFSTATE(i, 2) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
-                                print("esco da WFSTATE = -1 e entro in WFSTATE = 2")
-                        else:
-                            if self.START[i] == 100: 
-                                self._SwitchWFSTATE(i, 4)
-                                print("esco da WFSTATE = -1 e entro in WFSTATE = 0")
-                    elif self.S_WF[i] == -1: #seguo il muro di destra
-                        if rL == self.MAX_RANGE:
-                                self._SwitchWFSTATE(i, 2) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
-                                print("esco da WFSTATE = -1 e entro in WFSTATE = 2")
-                        else:
-                            if self.START[i] == 100:
-                                self._SwitchWFSTATE(i, 4)
-                                print("esco da WFSTATE = -1 e entro in WFSTATE = 0")
-                elif (rR - self.prev_rR[i][0]) > self.td*0.001:
-                        omega[i]=([-1*self.C_OMEGA*0.5])
-                elif (rR - self.prev_rR[i][0]) <- self.td*0.001: 
-                        omega[i]=([1*self.C_OMEGA*0.5])
-                ###### Topological
-                if self.stateminus1counter[i][0] == 140: # era 100 ; TODO: aggiungi che lo fa anche se capisce di essere in junction
-                    self.add_point(i,self.pos[i],'corridor')
-                    self.stateminus1counter[i][0] = 0   
-
+                vel [i] = np.dot(  2*cv , [0. , 0. , 0.] )
+                if  self.step_counter*self.PYB_TIMESTEP > i*7 : # se il tempo trascorso è almeno 10 secondi per ogni id
+                    vel [i] = np.dot(  2*cv , [1. , 0. , 0.] )
+                    ### aggiunta nodo iniziale
+                    if self.stateminus1counter[i] == -1:
+                        self.add_point(i,self.pos[i],'start')
+                    self.stateminus1counter[i][0] += 1
+                    if np.abs(rR - self.DIST_WALL_REF) > 1.5 or np.abs(rL - self.DIST_WALL_REF) > 1.5 : 
+                        #scelta randomica del muro da seguire   
+                        self._SwitchWFSTATE(i, 4)
+                        print("esco da WFSTATE = -1 e entro in WFSTATE = 4")
+                    elif (rR - self.prev_rR[i][0]) > self.td*0.001:
+                            omega[i]=([-1*self.C_OMEGA*0.5])
+                    elif (rR - self.prev_rR[i][0]) <- self.td*0.001: 
+                            omega[i]=([1*self.C_OMEGA*0.5])
+                    ###### Topological
+                    if self.stateminus1counter[i][0] == 100: # era 100 ; TODO: aggiungi che lo fa anche se capisce di essere in junction
+                        self.add_point(i,self.pos[i],'corridor')
+                        self.stateminus1counter[i][0] = 0   
 
         ######################  STATO 1 : WALLFOLLOWING  ############################
         ### possibili migliorie: - tuning dei coefficienti di _WallFollowingandAlign per un andamento meno oscillante
             elif self.WFSTATE[i][0] == 1 : # wallfollowing
-                vel [i] = np.dot(  cv , [1. , 0. , 0.] ) 
+                vel [i] = np.dot(  2*cv , [1. , 0. , 0.] ) 
                 omega[i] = self._WallFollowingandAlign3(i)  
                 self.state1counter[i][0] += 1
+                if rF < 0.8*self.DIST_WALL_REF: #se il muro frontale è pericolosamente troppo vicino 
+                    self._SwitchWFSTATE(i, 0)
+                    print("esco da WFSTATE = 1 (MURO FRONTALE TROPPO VICINO) e entro in WFSTATE = 0")
                 if self.S_WF[i][0] == 1: # wallfollowing con muro a destra
-                        if np.abs(rF - self.DIST_WALL_REF) < 5*self.td and np.abs(rR - self.DIST_WALL_REF) < 8*self.td :
-                           if len(inferiors)==0:
-                                self._SwitchWFSTATE(i, 0)
-                                print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo")
-                        if np.abs(self.prev_rR[i][0] - rR) > 1.5*self.td : #condizione con la storia di rR
-                            turn_direction = self._decisionSystem(i)
-                            if  turn_direction == self.S_WF[i][0] and self.MOVE_FORWARD[i][0] == False:
-                                self._SwitchWFSTATE(i, 2) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
-                                print("esco da WFSTATE = 1 e entro in WFSTATE = 2")
-                            elif self.MOVE_FORWARD[i][0] == False or self.state1counter[i][0]>120 : 
-                                self._SwitchWFSTATE(i, 4) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
-                                print("esco da WFSTATE = 1 e entro in WFSTATE = 4")
+                    if np.abs(rF - self.DIST_WALL_REF) < 5*self.td and np.abs(rR - self.DIST_WALL_REF) < 8*self.td :
+                        self._SwitchWFSTATE(i, 0)
+                        print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo")    
+                    if np.abs(self.prev_rR[i][0] - rR) > 1.5*self.td : #se perdo il muro
+                        turn_direction = self._decisionSystem(i)
+                        if  turn_direction == -1 and self.MOVE_FORWARD[i][0] == False:
+                            self._SwitchWFSTATE(i, 2) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
+                            print("esco da WFSTATE = 1 e entro in WFSTATE = 2")
+                        elif self.MOVE_FORWARD[i][0] == False or self.state1counter[i][0]>120 : 
+                            self._SwitchWFSTATE(i, 4) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
+                            print("esco da WFSTATE = 1 e entro in WFSTATE = 4")
+                    elif rR < 0.6 * self.DIST_WALL_REF:
+                        self._SwitchWFSTATE(i, 0)
+                        print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono troppo vicino al muro laterale")
                 elif self.S_WF[i][0] == -1: # wallfollowing con muro a sinistra
-                        if np.abs(rF - self.DIST_WALL_REF) < 5*self.td and np.abs(rL - self.DIST_WALL_REF) < 8*self.td :
-                            if len(inferiors)==0:
-                                self._SwitchWFSTATE(i, 0)
-                                print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo")
-                        if np.abs(self.prev_rL[i][0] - rL) > 1.5*self.td : #condizione con la storia di rR
-                            turn_direction = self._decisionSystem(i)
-                            if  turn_direction == self.S_WF[i][0] and self.MOVE_FORWARD[i][0] == False:
-                                self._SwitchWFSTATE(i, 2) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
-                                print("esco da WFSTATE = 1 e entro in WFSTATE = 2")
-                            else: 
-                                self._SwitchWFSTATE(i, 4) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
-                                print("esco da WFSTATE = 1 e entro in WFSTATE = 4")
+                    if np.abs(rF - self.DIST_WALL_REF) < 5*self.td and np.abs(rL - self.DIST_WALL_REF) < 8*self.td :
+                        self._SwitchWFSTATE(i, 0)
+                        print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo")
+                    if np.abs(self.prev_rL[i][0] - rL) > 1.5*self.td : #condizione con la storia di rR
+                        turn_direction = self._decisionSystem(i)
+                        if  turn_direction ==1 and self.MOVE_FORWARD[i][0] == False:
+                            self._SwitchWFSTATE(i, 2) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
+                            print("esco da WFSTATE = 1 e entro in WFSTATE = 2")
+                        elif self.MOVE_FORWARD[i][0] == False or self.state1counter[i][0]>120 :
+                            self._SwitchWFSTATE(i, 4) #dovrei seguire il muro ma non lo vedo più --> ci sta un angolo 
+                            print("esco da WFSTATE = 1 e entro in WFSTATE = 4")
+                    elif rL < 0.6 * self.DIST_WALL_REF:
+                         self._SwitchWFSTATE(i, 0)
+                         print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono troppo vicino al muro laterale")
                 ###### Topological
                 if self.state1counter[i][0] == 120: # era 100 ; TODO: aggiungi che lo fa anche se capisce di essere in junction
                     self.add_point(i,self.pos[i],'corridor')
@@ -558,38 +573,39 @@ class MapAviary(ProjAviary):
                 omega[i] = ([-self.S_WF[i][0]*state_2_omega_coeff*cv/self.radius[i][0]])
                 self.turn_start_yaw[i][0] += omega[i] * time_step
                 print ("l'angolo di curva accumulato è" , self.turn_start_yaw[i][0])
+                if rF < 1.2 * self.DIST_WALL_REF:
+                    self._SwitchWFSTATE(i, 0)
                 if np.abs(self.turn_start_yaw[i][0]) > 1.4 : # se l'angolo accumulato è maggiore di un certo angolo (per ora metto 1 che è tipo 60 deg)
                     # e solo ora faccio la verifica con grosso salto di rR # TODO sensibilità da tunare
                     if self.S_WF[i][0] == 1: # wallfollowing con muro a destra
                         print("la differenza tra il range destro attuale e precedente è:", np.abs(rR - self.prev_rR[i][0]) )
-                        print("la tolleranza per passare a 3 è", self.td*0.0015)
                         if self.prev_rR[i][0] != self.MAX_RANGE and np.abs(rR - self.prev_rR[i][0]) < self.td*0.001:
-                            self._SwitchWFSTATE(i, 3)
-                            print("esco da WFSTATE = 2 e entro in WFSTATE = 3 poichè sono abbastanza allineato col muro")
-                        if np.abs(rR - self.prev_rR[i][0]) > 0.5 or rR == self.MAX_RANGE:
-                           self._SwitchWFSTATE(i, 3)
-                        if np.abs(rF- self.DIST_WALL_REF)<self.td*0.5:
-                           self._SwitchWFSTATE(i, 0)
+                            self._SwitchWFSTATE(i, 0)
+                            print("esco da WFSTATE = 2 e entro in WFSTATE = 0 poichè sono abbastanza allineato col muro")
+                        #if np.abs(rR - self.prev_rR[i][0]) > 0.5 or rR == self.MAX_RANGE:  # forse commentabile
+                        #   self._SwitchWFSTATE(i, 3)                        
                     elif self.S_WF[i][0] == -1: # wallfollowing con muro a sinistra
                         print("la differenza tra il range sinistro attuale e precedente è:", np.abs(rL - self.prev_rL[i][0]) )
                         if self.prev_rL[i][0] != self.MAX_RANGE and np.abs(rL - self.prev_rL[i][0]) < self.td*0.001 : # 0.0015 era bono
-                            self._SwitchWFSTATE(i, 3)
-                            print("esco da WFSTATE = 2 e entro in WFSTATE = 3 poichè sono abbastanza allineato col muro")
-                        if np.abs(rL - self.prev_rL[i][0]) > 0.5 or rL == self.MAX_RANGE:
-                            self._SwitchWFSTATE(i, 3)
-                        if np.abs(rF- self.DIST_WALL_REF)<self.td*0.5:
-                           self._SwitchWFSTATE(i, 0)
-                    
-                            
+                            self._SwitchWFSTATE(i, 0)
+                            print("esco da WFSTATE = 2 e entro in WFSTATE = 0 poichè sono abbastanza allineato col muro")
+                        #if np.abs(rL - self.prev_rL[i][0]) > 0.5 or rL == self.MAX_RANGE: # forse commentabile
+                        #    self._SwitchWFSTATE(i, 3)
 
+                    
         ######################  STATO 3 : POST-0 / POST-CURVA AVVICINAMENTO A DISTWALLREF  ############################
         ### avvia dopo la curva quando il drone è circa parallelo al muro, serve a portarlo a DISTWALLREF con una velocità laterale
         ### possibili migliorie:
         ###                    
             elif self.WFSTATE[i][0] == 3:
-                self.state3counter[i][0] += 1 
+                self.state3counter[i][0] += 1
+                if rR < 0.3 * self.DIST_WALL_REF or rL < 0.3 * self.DIST_WALL_REF or rF < 0.3 * self.DIST_WALL_REF:
+                    self._SwitchWFSTATE(i, 0)
+                    print("esco da WFSTATE = 3 e entro in WFSTATE = 0 poichè sono troppo vicino a un muro")
                 if self.S_WF[i][0] == 1: # wallfollowing con muro a destra
                     if  (np.abs(rR - self.prev_rR[i][0])  > 0.5 or rR == self.MAX_RANGE) and self.state3counter[i][0] < 120 :
+                    # if  (np.abs(rR - self.DIST_WALL_REF)  > 0.5) and self.state3counter[i][0] < 120 :
+                    # #se rischio di aver perso il ranger post curva vado un pò avanti
                         vel [i] = np.dot(  cv , [1. , 0. , 0.] )
                         omega[i] = ([0]) 
                     else :
@@ -604,6 +620,8 @@ class MapAviary(ProjAviary):
                             vel[i] = np.dot(  cv ,[np.cos(np.pi/3) , np.sin(np.pi/3) , 0.] )
                 elif self.S_WF[i][0] == -1: # wallfollowing con muro a sinistra
                         if  (np.abs(rL - self.prev_rL[i][0])  > 0.5 or rL == self.MAX_RANGE) and self.state3counter[i][0] < 120 :
+                        # if  (np.abs(rL - self.DIST_WALL_REF)  > 0.5) and self.state3counter[i][0] < 120 :
+                        # #se rischio di aver perso il ranger post curva vado un pò avanti
                             vel [i] = np.dot(  cv , [1. , 0. , 0.] )
                             omega[i] = ([0]) 
                         else:
@@ -613,55 +631,64 @@ class MapAviary(ProjAviary):
                                 self._SwitchWFSTATE(i, 1)
                                 print("esco da WFSTATE = 3 e entro in WFSTATE = 1 poichè sono alla dist giusta dal muro")
                             elif rL > self.DIST_WALL_REF:
-                                vel[i] = np.dot(  cv ,  [np.cos(np.pi/3) , np.sin(np.pi/3)  , 0.] )
+                                vel[i] = np.dot(  cv , [np.cos(np.pi/3) , np.sin(np.pi/3)  , 0.] )
                             else:
                                 vel[i] = np.dot(  cv , [np.cos(np.pi/3), - np.sin(np.pi/3) , 0.] )
-        ######################  STATO 4 : IN UN incrocio SE SCELGO DI GIRARE NEL VERSO OPPOSTO AL MURO CHE SEGUO  ############################
+        ######################  STATO 4 : AVANZAMENTO LINEARE SENZA RIFERIMENTI  ############################
+        ### avvia dopo che a una junction il drone decide di andare dritto
+        ### il problema è la mancanza di riferimento e le condizioni di uscita sono su rR, rL e rF
             elif self.WFSTATE[i][0] == 4:               
                 omega [i] = ([0])
                 vel [i] = np.dot(  2*cv , [1. , 0. , 0.] )
-                #alfa = self.rpy[i][2] - self.WF_ref_angle[i]  # pos se sbando verso sinistra
-                #                                                      # neg se sbando verso destra
-                #alfa = self._anglefix(alfa)
-                #if alfa > 0.05:# pos se sbando verso sinistra
-                #               # neg se sbando verso destra
-                #    omega[i] = ([-1*self.C_OMEGA]) # rot neg
-                #    vel [i] = np.dot(  2*cv , [0. , 0. , 0.] )
-                #elif alfa < -0.05:
-                #    omega[i] = ([+1*self.C_OMEGA]) # rot 
-                #    vel [i] = np.dot(  2*cv , [0. , 0. , 0.] )#mettere valore di massimo 3 gradi 
-                #else: # va dritto a velocità doppia
                 self.state4counter[i][0]+=1
-                if  np.abs(rF - self.DIST_WALL_REF) < self.td and np.abs(rL - self.DIST_WALL_REF)>0.5 and np.abs(rR- self.DIST_WALL_REF)>0.5  :
+                if  np.abs(rF - self.DIST_WALL_REF) < self.td : # se la distanza frontale è circa DWR
+                    if np.abs(rL - self.DIST_WALL_REF)>0.5 and np.abs(rR- self.DIST_WALL_REF)>0.5 : # e ho via libera a destra e sinistra
                         self.S_WF[i][0] = self._decisionSystem(i)
-                        self._SwitchWFSTATE(i, 0)
-                        print("esco da WFSTATE = 4 (ho un muro davanti) e entro in WFSTATE = 0")
-                elif self.S_WF[i][0] == 1:
+                    elif np.abs(rL - self.DIST_WALL_REF)>0.5: # se ho un minimo di via libera solo Sx
+                        self.S_WF[i][0]=1
+                    elif np.abs(rL - self.DIST_WALL_REF)>0.5: # se ho un minimo di via libera solo Dx
+                        self.S_WF[i][0]=-1
+                    self._SwitchWFSTATE(i, 0)
+                    print("esco da WFSTATE = 4 (ho un muro davanti) e entro in WFSTATE = 0")
+                # elif self.state4counter[i][0] > 150 : 
+                # # se la rF è ancora maggiore di DWR e ho comunque camminato un tot
+                # # mi devo assicurare di non avvicinarmi troppo a un muro in maniera diagonale
+                #     if np.abs(rR - self.DIST_WALL_REF) < self.td or rR < self.DIST_WALL_REF: # test seconda condizione
+                #         self.S_WF[i][0]= 1   
+                #         self._SwitchWFSTATE(i, 0)
+                #         print("esco da WFSTATE = 4 (ho un muro a destra) e entro in WFSTATE = 0")
+                #     elif np.abs(rL - self.DIST_WALL_REF) < self.td or rL < self.DIST_WALL_REF: # test seconda condizione
+                #         self.S_WF[i][0]= -1
+                #         self._SwitchWFSTATE(i, 0)
+                #         print("esco da WFSTATE = 4 (ho un muro a sinistra) e entro in WFSTATE = 0")                          
+                else: 
                     if (rL - self.prev_rL[i][0]) > self.td*0.01:
                         vel [i] = np.dot(  2*cv , [np.cos(np.pi/8) , np.sin(np.pi/8),0.] )
                     elif (rL - self.prev_rL[i][0]) <- self.td*0.01: 
                          vel [i] = np.dot(  2*cv , [np.cos(np.pi/8) , - np.sin(np.pi/8),0.] )
-                    if (np.abs(rR - self.prev_rR[i][0]) < self.td*0.5 and (rR != self.MAX_RANGE or np.abs(rR - self.DIST_WALL_REF)<self.td*2)) and self.state4counter[i][0] > 200:
-                        self._SwitchWFSTATE(i, 3)
-                        print("esco da WFSTATE = 4 (ho un muro a destra) e entro in WFSTATE = 1")
-                elif self.S_WF[i][0] == -1:
-                    if (rR - self.prev_rR[i][0]) > self.td*0.01:
-                         vel [i] = np.dot(  2*cv , [np.cos(np.pi/8) , - np.sin(np.pi/8),0.] )
-                    elif (rR - self.prev_rR[i][0]) <- self.td*0.01: 
-                         vel [i] = np.dot(  2*cv , [np.cos(np.pi/8) , + np.sin(np.pi/8),0.] )
-                    if (np.abs(rL - self.prev_rL[i][0]) < self.td*0.5 and (rL != self.MAX_RANGE or np.abs(rL - self.DIST_WALL_REF)<self.td*2)) and self.state4counter[i][0] > 200:
-                        self._SwitchWFSTATE(i, 3)
-                        print("esco da WFSTATE = 4 (ho un muro a sinistra) e entro in WFSTATE = 1")
-
+                    if (rR != self.MAX_RANGE and rR < self.DIST_WALL_REF*1.5) and self.state4counter[i][0] > 200:
+                        self.S_WF[i][0]=1
+                        self._SwitchWFSTATE(i, 0)
+                        print("esco da WFSTATE = 4 (ho un muro a destra) e entro in WFSTATE = 0")
+                    if (rL != self.MAX_RANGE and rL < self.DIST_WALL_REF*1.5) and self.state4counter[i][0] > 200:
+                        self.S_WF[i][0]=-1
+                        self._SwitchWFSTATE(i, 0)
+                        print("esco da WFSTATE = 4 (ho un muro a sinistra) e entro in WFSTATE = 0")
+                ###### Topological
+                if self.state4counter[i][0] == 80: # era 100 ; TODO: aggiungi che lo fa anche se capisce di essere in junction
+                    self.add_point(i,self.pos[i],'corridor')
+                    self.state4counter[i][0] = 0  
 
         ######################  STATO 5 : ENTRATA NEL COLLISION AVOIDANCE  ############################
             elif self.WFSTATE[i][0] == 5:
                     vel [i] = np.dot(  cv , [0, 0 , 0] )
                     omega[i] = ([0])
-                    if  len(superiors) == 0:
+                    if len(superiors) == 0: #se non ha superiori
                         self.state5counter[i][0] += 1
-                        if self.state5counter[i][0] > 150 :
+                        if self.state5counter[i][0] > 50 :
                             self._SwitchWFSTATE(i, 6)
+                    else: #se ha superiori
+                        self.state5counter[i][0] = 0
         ######################  STATO 6 : USCITA DAL COLLISION AVOIDANCE  ############################
             elif self.WFSTATE[i][0] == 6:
                     self.state6counter[i][0] += 1
@@ -670,9 +697,9 @@ class MapAviary(ProjAviary):
                     print(self.state6counter[i][0])
                     if  len(superiors)!= 0:
                         self._SwitchWFSTATE(i, 5)
-                    elif self.state6counter[i][0] > 100 :
-                         self._SwitchWFSTATE(i, self.memory_state[i])
-                         self.memory_state[i] = np.inf
+                    elif self.state6counter[i][0] > 50 :
+                         self._SwitchWFSTATE(i, self.memory_state[i][0])
+                         #self.memory_state[i][0] = 9
             print("vel=", vel[i])
             print("omega=", omega[i][0]) 
             self.prev_rR[i] = rR
@@ -722,6 +749,8 @@ class MapAviary(ProjAviary):
                 self.state6counter[nth_drone][0] = 0
     ## SEZIONE AGGIUNTA PUNTI ##  
     # TODO: aggiunta punti in stato 4 (SOLO SE NECESSARIO) e -1>>>2
+            if new_WFSTATE == 4:
+                self.add_point(nth_drone,self.pos[nth_drone],'junction')
             if old_WFSTATE != 0 and new_WFSTATE == 1:
                 self.add_point(nth_drone,self.pos[nth_drone],'corridor')
             if new_WFSTATE == 2: # inizio curva
@@ -732,43 +761,34 @@ class MapAviary(ProjAviary):
     #### LOGICA CORNER ACKNOWLEDGEMENT ###
             if old_WFSTATE == 1 and new_WFSTATE == 0: # 
                 self.IM_IN_A_CORNER[nth_drone][0] = True
-            if old_WFSTATE == 0 and new_WFSTATE == 1:
+            if old_WFSTATE == 0:
                 if self.IM_IN_A_CORNER[nth_drone][0] == True:
                     self.add_point(nth_drone,self.pos[nth_drone],'corner')
                 self.IM_IN_A_CORNER[nth_drone][0] = False
     #### gestione scelta randomica in un incrocio
     # self.MOVE_FORWARD modifica il comportamento degli stati 0 e 4 così che sappiano che sono post-4
-            if (old_WFSTATE == 4 and new_WFSTATE == 0) or (old_WFSTATE == 4 and new_WFSTATE == 1):
+            if (old_WFSTATE == 4 and new_WFSTATE == 0): # or (old_WFSTATE == 4 and new_WFSTATE == 1):
                 self.MOVE_FORWARD[nth_drone][0] = True
             else:
                 self.MOVE_FORWARD[nth_drone][0] = False 
-    #### OBSTACLE AVOIDANCE, salva lo stato precedente
-            if new_WFSTATE == 5 and old_WFSTATE!=6 :
+    #### OBSTACLE AVOIDANCE, appena entra in 5 (non da 6) salva lo stato precedente
+            if new_WFSTATE == 5 and old_WFSTATE != 6 : 
+                self.memory_position[nth_drone][0:3] = self.pos[nth_drone]
+                self.memory_position[nth_drone][3:6] = self.rpy[nth_drone]
                 self.memory_state[nth_drone] = old_WFSTATE
+                self.waiting_position[nth_drone] = self.determine_waiting_position(nth_drone)             
     #### GESTISCE SCELTA RAGGIO DELLA CURVA state 2    
             if new_WFSTATE == 2:
                 if self.S_WF [nth_drone] == 1 :
-                    if old_WFSTATE == -1:
-                        if self.prev_rR[nth_drone] < 1.5:
-                            self.radius[nth_drone] = self.prev_rR[nth_drone]
-                        else:
-                            self.radius[nth_drone] =self.DIST_WALL_REF*1.3
+                    if self.prev_rR[nth_drone] < 1:
+                        self.radius[nth_drone] = self.prev_rR[nth_drone]
                     else:
-                        if self.prev_rR[nth_drone] < 1:
-                            self.radius[nth_drone] = self.prev_rR[nth_drone]
-                        else:
-                            self.radius[nth_drone] =self.DIST_WALL_REF
+                        self.radius[nth_drone] =self.DIST_WALL_REF
                 elif self.S_WF [nth_drone] == -1: 
-                    if old_WFSTATE == -1:
-                        if self.prev_rL[nth_drone] < 1.5:
-                            self.radius[nth_drone] = self.prev_rL[nth_drone]
-                        else:
-                            self.radius[nth_drone] =self.DIST_WALL_REF*1.3
+                    if self.prev_rL[nth_drone] < 1:
+                        self.radius[nth_drone] = self.prev_rL[nth_drone]
                     else:
-                        if self.prev_rL[nth_drone] < 1:
-                            self.radius[nth_drone] = self.prev_rL[nth_drone]
-                        else:
-                            self.radius[nth_drone] =self.DIST_WALL_REF
+                        self.radius[nth_drone] =self.DIST_WALL_REF
             #elif new_WFSTATE == 2  :
             #    self.radius[nth_drone] = self.DIST_WALL_REF
             # flagga il contatore come True
@@ -777,6 +797,49 @@ class MapAviary(ProjAviary):
             print("ha tentato di cambiare stato 2 volte nello stesso step")
 
     ################################################################################
+
+    def determine_waiting_position(self,
+                                   nth_drone):
+        """
+        determina la posizione di attesa di un drone che deve cedere precedenza
+        si basa sulla posizione attuale del drone e sui range finders e somma alla posizione corrente un certo displacement
+        Deve andare in alto di un certo valore e laterale di un certo valore
+        Guarda i 4 valori dei range finders laterali (rF, rL, rB, rR) e decide la direzione laterale in base al minore di questi valori
+        Returns
+        --------
+        waiting_position : ndarray - [float float float] 
+            (3)-shaped array che contiene la posizione in cui drone deve attendere
+        """
+        current_pos = self.pos[nth_drone]
+        rF = self.observation[nth_drone][0]  # Range Finder frontale
+        rL = self.observation[nth_drone][1]  # Range Finder sinistro
+        rB = self.observation[nth_drone][2]  # Range Finder posteriore
+        rR = self.observation[nth_drone][3]  # Range Finder destro
+        min_range_value = min(rF, rL, rB, rR)
+        vertical_displacement = 0.2  # Spostamento in alto
+        lateral_displacement = min_range_value/3  # Spostamento laterale
+
+        if min_range_value == rF:
+            horizontal_displacement = np.array([lateral_displacement , 0.0 , 0.0])  # Spostamento davanti
+        elif min_range_value == rL:
+            horizontal_displacement = np.array([0.0, lateral_displacement, 0.0])  # Spostamento verso sinistra
+        elif min_range_value == rB:
+            horizontal_displacement = np.array([-lateral_displacement , 0.0 , 0.0])  # Spostamento dietro
+        elif min_range_value == rR:
+            horizontal_displacement = np.array([0.0, -lateral_displacement, 0.0])  # Spostamento verso destra
+        # rotazione
+        yaw = self.rpy[nth_drone][2]
+        rot_mat = np.array([[np.cos(yaw), -np.sin(yaw), 0.0],  
+                            [np.sin(yaw), np.cos(yaw), 0.0],                                           
+                            [0.0, 0.0, 1.0]])
+        #absolute_horizontal_displacement = np.dot(rot_mat, horizontal_displacement)
+        absolute_horizontal_displacement = np.dot(horizontal_displacement,rot_mat.T)
+        # Se lo stato prorpio è 4 ci si muove solo verticale
+        if self.WFSTATE[nth_drone] == 4:
+            horizontal_displacement = np.array([0.0 , 0.0 , 0.0])
+        # Calcolare la posizione di attesa
+        waiting_position = current_pos + np.array([0.0, 0.0, vertical_displacement]) + absolute_horizontal_displacement
+        return waiting_position
 
     def _WallFollowingandAlign3(self,
                                 nth_drone):    #ALG B.2  versione con solo il sensore davanti, credo necessiti di un meccanismo di memoria
@@ -792,8 +855,8 @@ class MapAviary(ProjAviary):
         WFstate: int
             aggiorna il WFstate
         """
-        outside_region_omega_reduction_factor = 2 # buono:1.5 ## TODO : tuning 
-        inside_region_omega_reduction_factor = 0.6 # buono:0.4 ## TODO: tuning
+        outside_region_omega_reduction_factor = 1.5 # buono:1.5 ## TODO : tuning 
+        inside_region_omega_reduction_factor = 0.3 # buono:0.4 ## TODO: tuning
         
         alfa = self.rpy[nth_drone][2] - self.WF_ref_angle[nth_drone]  # pos se sbando verso sinistra
                                                                       # neg se sbando verso destra
@@ -923,37 +986,55 @@ class MapAviary(ProjAviary):
         """
         collision_treshold = 1.5*self.DIST_WALL_REF
         drones_position = np.array([self._getDroneStateVector(j)[0:3] for j  in range(self.NUM_DRONES)])
-        drone_velocity = self._getDroneStateVector(nth_drone)[10:13] 
         drones_distance =  np.array([[np.inf] for j in range(self.NUM_DRONES)] )
         collision =  np.array([[0] for j in range(self.NUM_DRONES)] )
-
         for i in range(self.NUM_DRONES):
             if i!= nth_drone : #and self.WFSTATE[nth_drone]!=-1:
                 relative_position = drones_position[i] - drones_position[nth_drone]
                 rot_mat = np.array(p.getMatrixFromQuaternion(self.quat[nth_drone, :])).reshape(3, 3) 
-                relative_position_rel = np.dot(relative_position,rot_mat)   
-                drones_distance[i] = self.euclidean_distance( drones_position[nth_drone], drones_position[i])
-                motion_drones = drones_distance[i] - self.drones_distance_pre[i]
+                relative_position_rel = np.dot(relative_position,rot_mat) # posizione relativa nel sistema relativo di nth_drone  
+                drones_distance[i] = self.euclidean_distance( drones_position[nth_drone][0:2], drones_position[i][0:2]) #distanza euclidea nel piano xy   
+                motion_drones = drones_distance[i] - self.drones_distance_pre[i,nth_drone] # identifica se i droni si stanno avvicinando
 
-                if drones_distance[i] <= collision_treshold :
+                if drones_distance[i] <= collision_treshold and self.WFSTATE[nth_drone] !=-1 :
                     #verifico se è dentro la mia treshold
-                    collision[i] = 1 
-                    if ((relative_position_rel[0]>=0 ) or ( relative_position_rel[0]<0.01 and motion_drones > 0 )) and np.abs(relative_position[2])<0.3 :
-                     # prima e seconda condizione sono per capire se lo ho davanti e gli sto andando in contro
+                    if relative_position_rel[0]<=0:
+                        collision[i] = 1 
+                    elif (relative_position_rel[0]>=0.2 and motion_drones < -0.0001 )\
+                          or ( relative_position_rel[0]<= -0.2 and motion_drones < -0.0001) \
+                           or drones_distance[i] < 1.1*self.DIST_WALL_REF  :
+                     # prima e seconda condizione sono per capire se lo ho davanti e gli sto andando in contro o se sono molto vicini
                      #la seconda è per capire se lo ho dietro e lui mi sta venendo incontro
                      #la terza controllo se è a una quota pericolosa                  
-                        if (self.WFSTATE[nth_drone][0] != 4 and self.WFSTATE[nth_drone][0] != 0) and (self.WFSTATE[i][0] == 4 or self.WFSTATE[i][0] == 0): # se il drone i sta in stato 4 o 6 ha la precedenza
+                        if i < nth_drone: 
                             collision[i] = 2
-                        elif (self.WFSTATE[i][0] != 4  and self.WFSTATE[i][0] != 0) and (self.WFSTATE[nth_drone][0] == 4  or self.WFSTATE[nth_drone][0] == 0): # se il drone nth_drone sta in stato 4 o 6 ha la precedenza
+                    
+                        
+                        
+                    '''if (self.WFSTATE[nth_drone][0] != 4 and self.WFSTATE[nth_drone][0] != 2) and (self.WFSTATE[i][0] == 4 or self.WFSTATE[i][0] == 2): # se il drone i sta in stato 4 o 6 ha la precedenza
+                            collision[i] = 2
+                        elif (self.WFSTATE[i][0] != 4 and self.WFSTATE[i][0] != 2 ) and (self.WFSTATE[nth_drone][0] == 4 or self.WFSTATE[nth_drone][0] == 2 ): # se il drone nth_drone sta in stato 4 o 6 ha la precedenza
                             collision[i] = 1
-                        elif (self.WFSTATE[nth_drone][0] == 4  or self.WFSTATE[nth_drone][0] == 0) and (self.WFSTATE[i][0] == 4 or self.WFSTATE[i][0] == 0): # se il drone i sta in stato 4 o 6 ha la precedenza
-                            if i < nth_drone :
+                        elif (self.WFSTATE[i][0] == 4 or self.WFSTATE[i][0] == 2 ) and (self.WFSTATE[nth_drone][0] == 4 or self.WFSTATE[nth_drone][0] == 2 ):
+                            if self.WFSTATE[nth_drone][0] == 4 and self.WFSTATE[i][0] == 2:
+                               collision[i] = 1
+                            elif self.WFSTATE[nth_drone][0] == 2 and self.WFSTATE[i][0] == 4:
                                 collision[i] = 2
-                        elif (self.WFSTATE[i][0]  == 5 or self.WFSTATE[i][0]  == 6):
-                            collision[i] = 1
-                        elif (i < nth_drone and (drones_distance[i] <= 0.5*collision_treshold) ): 
-                            collision[i] = 2
-            self.drones_distance_pre = drones_distance
+                            else:
+                                if i < nth_drone: 
+                                    collision[i] = 2
+                        elif self.WFSTATE[nth_drone] != -1:
+                            if self.WFSTATE[nth_drone] == 5:
+                                collision[i] = 2
+                            elif self.WFSTATE[i] == 5:
+                                collision[i] = 1
+                            elif i < nth_drone: 
+                                collision[i] = 2
+                        elif i < nth_drone: 
+                            collision[i] = 2 '''
+                     
+                     
+        self.drones_distance_pre[:,nth_drone:nth_drone+1] = drones_distance
         return collision 
   
 ############################## CREAZIONE MAPPA TOPOLOGICA ############################################
@@ -1329,14 +1410,17 @@ class MapAviary(ProjAviary):
             to_add_drone2 = []
             to_remove_balls = set()
             seen_coords = set()
-
+            already_merged1 = set()  # Set per tracciare i nodi già mergiati dal drone 1
+            already_merged2 = set()  # Set per tracciare i nodi già mergiati dal drone 2
             # Inizializza i contatori per il prossimo point_id
             k = 0
             for point_id_drone1, data1 in drone1_points.items():
                 for point_id_drone2, data2 in drone2_points.items():
-                    next_point_id_drone1 = self.get_next_point_id(drone1_id)
-                    next_point_id_drone2 = self.get_next_point_id(drone2_id)
-                    if 0.1 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold and data1['type']!='start' and data2['type']!='start':
+                    #next_point_id_drone1 = self.get_next_point_id(drone1_id)
+                    #next_point_id_drone2 = self.get_next_point_id(drone2_id)
+                    if 0.01 < self.euclidean_distance(data1['coords'], data2['coords']) < threshold \
+                            and data1['type']!='start' and data2['type']!='start' \
+                            and point_id_drone1 not in already_merged1 and point_id_drone2 not in already_merged2:
                         new_coords = np.mean([data1['coords'], data2['coords']], axis=0).tolist()
                         new_coords_tuple = tuple(new_coords)
                         # Accumula le chiavi da rimuovere a prescindere dall'aggiunta o no di un nuovo nodo mediato
@@ -1351,6 +1435,8 @@ class MapAviary(ProjAviary):
                             if data1['type'] == 'junction' or data2['type'] == 'junction':
                                 new_type = 'junction'
                             # Incrementa i contatori
+                            next_point_id_drone1 = self.get_next_point_id(drone1_id)
+                            next_point_id_drone2 = self.get_next_point_id(drone2_id)
                             next_point_id_drone1 = self.increment_point_id(next_point_id_drone1, k)
                             next_point_id_drone2 = self.increment_point_id(next_point_id_drone2, k)
                             k += 1
@@ -1364,6 +1450,9 @@ class MapAviary(ProjAviary):
                             self.adjacency_matrices[drone2_id] = self.replace_node_in_adjacency_matrix(self.adjacency_matrices[drone2_id], point_id_drone2, next_point_id_drone2)
                             # Aggiungi le nuove coordinate a seen_coords
                             seen_coords.add(new_coords_tuple)
+                            # Aggiungi i nodi già mergiati ai set
+                            already_merged1.add(point_id_drone1)
+                            already_merged2.add(point_id_drone2)
 
             # Rimuovi le vecchie istanze e le vecchie palline
             to_remove_drone1 = set(to_remove_drone1) # evita ripetizioni
@@ -1716,15 +1805,9 @@ class MapAviary(ProjAviary):
 
         union_buffers = unary_union(buffers)
         covered_area = union_buffers.area
-        coverage_percent = (covered_area / self.total_area_polygon.area) * 100
-        ############# OBSOLETO ##############
-        # faccio la verifica di fine missione sulle singole percentuali non sul totale
-        ## if coverage_percent >= self.TARGET_COVERAGE and self.COVERAGE_IS_ENOUGH == False:
-        ##     self.efficiency = self.step_counter*self.PYB_TIMESTEP
-        ##     self.COVERAGE_IS_ENOUGH = True
-        ##     self.plot_coverage(self.total_area_polygon, radius) #TODO: vedere come deve esssere l'input EVALUATOR
-        ##     self.returning_phase_paths_planning()
-        return coverage_percent
+        total_coverage_percent = (covered_area / self.total_area_polygon.area) * 100
+        
+        return total_coverage_percent
 
     def calculate_coverage_individually(self, radius):
         """
@@ -1740,7 +1823,7 @@ class MapAviary(ProjAviary):
         list of float
             Una lista contenente la percentuale di copertura dell'area per ciascun drone.
         """
-        coverage_per_drone = []
+        single_drone_coverage_percent = []
 
         for drone_id, points in self.drones_db.items():
             buffers = []
@@ -1753,16 +1836,32 @@ class MapAviary(ProjAviary):
             union_buffers = unary_union(buffers)
             covered_area = union_buffers.area
             coverage_percent = (covered_area / self.total_area_polygon.area) * 100
-            coverage_per_drone.append(coverage_percent)
+            single_drone_coverage_percent.append(coverage_percent)
+        
+        return single_drone_coverage_percent
 
-        if all(coverage >= self.TARGET_COVERAGE for coverage in coverage_per_drone) \
-                and not self.COVERAGE_IS_ENOUGH:
-            self.efficiency = self.step_counter * self.PYB_TIMESTEP
+    def end_mission(self,
+                    radius):
+        """
+        determina il fine missione se il coverage totale è un certo valore e tutti i coverage singoli sono un altro certo valore
+        
+        updates
+        --------
+        self.COVERAGE_IS_ENOUGH
+        """
+        #### VERIFICA DI TUTTI I SINGOLI
+                
+        if self.total_coverage_percent >= self.TOTAL_TARGET_COVERAGE and \
+                all(coverage >= self.SINGLE_TARGET_COVERAGE for coverage in self.single_drone_coverage_percent) and \
+                self.COVERAGE_IS_ENOUGH == False:
+            self.efficiency = self.step_counter*self.PYB_TIMESTEP
             self.COVERAGE_IS_ENOUGH = True
-            self.plot_coverage(self.total_area_polygon, radius)  # Plotta la copertura totale
+            print(f"La percentuale totale di esplorazione è: {self.total_coverage_percent:.2f}%")
+            for i, coverage in enumerate(self.single_drone_coverage_percent):
+                print(f"La percentuale di esplorazione del drone {i+1} è: {coverage:.2f}%")
+            print(f"Il tempo impiegato a completare la missione è: {self.efficiency:.2f} s")
+            self.plot_coverage(self.total_area_polygon, radius) #TODO: vedere come deve esssere l'input EVALUATOR
             self.returning_phase_paths_planning()
-
-        return coverage_per_drone
 
 
     def plot_coverage(self, total_area_polygon, radius):
@@ -1785,7 +1884,7 @@ class MapAviary(ProjAviary):
         # Traccia l'area totale del labirinto
         rotated_total_area = rotate(total_area_polygon, 90, origin=(0, 0))
         x, y = rotated_total_area.exterior.xy
-        ax.plot(x, y, label='Total Area')
+        ax.plot(x, y, label='Total Area', color='black')
 
         for drone_id, points in self.drones_db.items():
             for point_id, data in points.items():
@@ -1795,16 +1894,16 @@ class MapAviary(ProjAviary):
                 rotated_buffer = rotate(buffer, 90, origin=(0, 0))
                 if rotated_buffer.geom_type == 'Polygon':
                     x, y = rotated_buffer.exterior.xy
-                    ax.plot(x, y, label=f'Buffer {point_id}')
+                    ax.fill(x, y, color='red', alpha=0.5, label=f'Buffer {point_id}')
                 elif rotated_buffer.geom_type == 'MultiPolygon':
                     for poly in rotated_buffer:
                         x, y = poly.exterior.xy
-                        ax.plot(x, y, label=f'Buffer {point_id}')
+                        ax.fill(x, y, color='red', alpha=0.5, label=f'Buffer {point_id}')
                 else:
                     rotated_point = rotate(point, 90, origin=(0, 0))
-                    ax.plot(rotated_point.x, rotated_point.y, 'o', label=f'Buffer {point_id}')
+                    ax.plot(rotated_point.x, rotated_point.y, 'o', color='red', label=f'Buffer {point_id}')
 
-            # Imposta le etichette degli assi
+        # Imposta le etichette degli assi
         plt.xlabel('y')
         plt.ylabel('x')
         plt.title('Coverage Area')
