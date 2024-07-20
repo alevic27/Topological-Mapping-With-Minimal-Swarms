@@ -599,7 +599,7 @@ class MapAviary(ProjAviary):
                 elif self.S_WF[i][0] == -1: # wallfollowing con muro a sinistra
                     if np.abs(rF - self.DIST_WALL_REF) < 5*self.td and np.abs(rL - self.DIST_WALL_REF) < 8*self.td :
                         self._SwitchWFSTATE(i, 0)
-                        print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo")
+                        print("esco da WFSTATE = 1 e entro in WFSTATE = 0 visto che sono in un angolo al muro laterale")
                     if np.abs(self.prev_rL[i][0] - rL) > 1.5*self.td : #condizione con la storia di rR
                         turn_direction = self._decisionSystem(i)
                         if  turn_direction ==1 and self.MOVE_FORWARD[i][0] == False:
@@ -729,7 +729,7 @@ class MapAviary(ProjAviary):
                     omega[i] = ([0])
                     if len(superiors) == 0: #se non ha superiori
                         self.state5counter[i][0] += 1
-                        if self.state5counter[i][0] > 50 :
+                        if self.state5counter[i][0] > 100 :
                             self._SwitchWFSTATE(i, 6)
                     else: #se ha superiori
                         self.state5counter[i][0] = 0
@@ -791,6 +791,12 @@ class MapAviary(ProjAviary):
                 self.state5counter[nth_drone][0] = 0
             elif new_WFSTATE == 6:
                 self.state6counter[nth_drone][0] = 0
+    #sezione start missione
+            if new_WFSTATE == 0 and old_WFSTATE == -1 and nth_drone!=self.NUM_DRONES-1:
+                self.START[nth_drone+1]= 1
+            #if nth_drone!=self.NUM_DRONES-1:
+                #if self.START[nth_drone+1] == 1 and new_WFSTATE == 0 and old_WFSTATE == 4:
+                    #self.START[nth_drone+1]= 2
     ## SEZIONE AGGIUNTA PUNTI ##  
     # TODO: aggiunta punti in stato 4 (SOLO SE NECESSARIO) e -1>>>2
             if new_WFSTATE == 4:
