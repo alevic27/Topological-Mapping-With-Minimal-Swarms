@@ -503,7 +503,7 @@ class MapAviary(ProjAviary):
             if self.WFSTATE[i] == -1 : 
                 omega [i] = ([0])
                 vel [i] = np.dot(  2*cv , [0. , 0. , 0.] )
-                if  self.step_counter*self.PYB_TIMESTEP > i*7 : # se il tempo trascorso è almeno 10 secondi per ogni id
+                if  self.step_counter*self.PYB_TIMESTEP > i*5.5 : # se il tempo trascorso è almeno 10 secondi per ogni id
                     vel [i] = np.dot(  2*cv , [1. , 0. , 0.] )
                     ### aggiunta nodo iniziale
                     if self.stateminus1counter[i] == -1:

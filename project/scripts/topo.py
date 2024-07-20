@@ -43,7 +43,7 @@ DEFAULT_SENSORS_RANGE = 4.
 # DOUBLE_T
 # DOUBLE_T_2X raddoppiato corridoi larghi
 # DOUBLE_T_V2 raddoppiato corridoi stretti
-DEFAULT_LABYRINTH_ID = Labyrinth.DOUBLE_T #modificare solo questa riga
+DEFAULT_LABYRINTH_ID = Labyrinth.DOUBLE_T_V2 #modificare solo questa riga
 # Configurazione del labirinto selezionato
 selected_config = LABYRINTH_CONFIG[DEFAULT_LABYRINTH_ID]
 DEFAULT_MAP_POLYGON = selected_config["polygon"]
